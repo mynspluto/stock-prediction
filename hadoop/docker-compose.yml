@@ -1,0 +1,75 @@
+version: "2"
+services:
+  namenode:
+    platform: linux/amd64
+    container_name: namenode
+    image: apache/hadoop:3
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    ports:
+      - 9870:9870
+      - 8020:8020
+    env_file:
+      - hadoop_config
+    environment:
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
+    networks:
+      - hadoop_network
+  datanode1:
+    platform: linux/amd64
+    container_name: datanode1
+    depends_on:
+      - namenode
+    image: apache/hadoop:3
+    command: ["hdfs", "datanode"]
+    env_file:
+      - hadoop_config
+    networks:
+      - hadoop_network
+  datanode2:
+    platform: linux/amd64
+    container_name: datanode2
+    depends_on:
+      - namenode
+    image: apache/hadoop:3
+    command: ["hdfs", "datanode"]
+    env_file:
+      - hadoop_config
+    networks:
+      - hadoop_network
+  datanode3:
+    platform: linux/amd64
+    container_name: datanode3
+    depends_on:
+      - namenode
+    image: apache/hadoop:3
+    command: ["hdfs", "datanode"]
+    env_file:
+      - hadoop_config
+    networks:
+      - hadoop_network
+  resourcemanager:
+    platform: linux/amd64
+    container_name: resourcemanager
+    image: apache/hadoop:3
+    hostname: resourcemanager
+    command: ["yarn", "resourcemanager"]
+    ports:
+      - 8088:8088
+    env_file:
+      - hadoop_config
+    networks:
+      - hadoop_network
+  nodemanager:
+    platform: linux/amd64
+    container_name: nodemanager
+    image: apache/hadoop:3
+    command: ["yarn", "nodemanager"]
+    env_file:
+      - hadoop_config
+    networks:
+      - hadoop_network
+
+networks:
+  hadoop_network:
+    name: hadoop_network
