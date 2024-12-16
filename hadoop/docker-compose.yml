@@ -13,6 +13,8 @@ services:
       - hadoop_config
     environment:
       ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
+    volumes:
+      - ./name-node-volume:/tmp/hadoop-hadoop/dfs/name
     networks:
       - hadoop_network
   datanode1:
@@ -24,6 +26,8 @@ services:
     command: ["hdfs", "datanode"]
     env_file:
       - hadoop_config
+    volumes:
+      - ./data-node-volume:/tmp/hadoop-hadoop/dfs/data
     networks:
       - hadoop_network
   resourcemanager:
