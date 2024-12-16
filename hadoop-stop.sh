@@ -1,1 +1,1 @@
-docker-compose -f ./docker-compose.yml --project-name=hadoop down
+docker-compose -f ./hadoop/docker-compose.yml --project-name=hadoop down

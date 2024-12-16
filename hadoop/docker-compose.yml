@@ -26,28 +26,6 @@ services:
       - hadoop_config
     networks:
       - hadoop_network
-  datanode2:
-    platform: linux/amd64
-    container_name: datanode2
-    depends_on:
-      - namenode
-    image: apache/hadoop:3
-    command: ["hdfs", "datanode"]
-    env_file:
-      - hadoop_config
-    networks:
-      - hadoop_network
-  datanode3:
-    platform: linux/amd64
-    container_name: datanode3
-    depends_on:
-      - namenode
-    image: apache/hadoop:3
-    command: ["hdfs", "datanode"]
-    env_file:
-      - hadoop_config
-    networks:
-      - hadoop_network
   resourcemanager:
     platform: linux/amd64
     container_name: resourcemanager
