@@ -4,6 +4,7 @@ import json
 import requests
 from datetime import datetime, timedelta
 import pandas as pd
+from hdfs import InsecureClient
 
 local_path = '/home/mynspluto/Project/stock-prediction/airflow/data'
 #webhdfs_url = 'http://localhost:9870/webhdfs/v1'
@@ -84,11 +85,26 @@ def split_json_by_month(local_path, ticker):
             print(f"Data for {ticker} for {year_month} saved to {month_file_path}")
     else:
         print(f"JSON file not found: {json_file_path}")
+
+def upload_json_to_hdfs(local_path):
+    # local_path에서 모든 JSON 파일 찾기
+    for root, dirs, files in os.walk(local_path):
+        for file in files:
+            if file.endswith('.json'):
+                # 각 JSON 파일 경로
+                local_file_path = os.path.join(root, file)
+
+                # HDFS 경로 설정 (디렉토리 구조를 유지하면서 업로드)
+                hdfs_path = f"/user/hadoop/{file}"
+
+                # JSON 파일을 HDFS에 업로드
+                client.upload(hdfs_path, local_file_path)
+                print(f"Uploaded {local_file_path} to HDFS path {hdfs_path}")
         
-fetch_stock_data(local_path, tickers)
+#ticker = '^IXIC'
+#fetch_stock_data(local_path, tickers)
+#print_json_records(local_path, ticker)
+#split_json_by_month(local_path, ticker)
 
-# 예시 호출
-ticker = '^IXIC'
-print_json_records(local_path, ticker)
-
-split_json_by_month(local_path, ticker)
+client = InsecureClient('http://localhost:9870', user='hadoop')
+upload_json_to_hdfs(local_path)

@@ -9,12 +9,13 @@ services:
     ports:
       - 9870:9870
       - 8020:8020
+      - 9000:9000
     env_file:
       - hadoop_config
     environment:
       ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
-    volumes:
-      - ./name-node-volume:/tmp/hadoop-hadoop/dfs/name
+    # volumes:
+    #   - ./name-node-volume:/tmp/hadoop-hadoop/dfs/name
     networks:
       - hadoop_network
   datanode1:
@@ -26,8 +27,11 @@ services:
     command: ["hdfs", "datanode"]
     env_file:
       - hadoop_config
-    volumes:
-      - ./data-node-volume:/tmp/hadoop-hadoop/dfs/data
+    ports:
+      - 9864:9864
+      - 9867:9867
+    # volumes:
+    #   - ./data-node-volume:/tmp/hadoop-hadoop/dfs/data
     networks:
       - hadoop_network
   resourcemanager:
