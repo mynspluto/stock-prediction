@@ -1,10 +1,22 @@
+import os
 import yfinance as yf
 import pandas as pd
 
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.apache.hdfs.operators.hdfs import HdfsOperator
+
+local_path = '/home/mynspluto/Project/stock-prediction/airflow'
+tickers = ['^IXIC']
+
+def fetch_stock_data(local_path, tickers):
+    if not os.path.exists(local_path):
+        os.makedirs(local_path)
+    for ticker in tickers:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period='max')
+        df.reset_index(inplace=True)
+        df.to_csv(f"{local_path}/{ticker}.csv", index=False)
 
 with DAG(
     "stock-predict",
@@ -29,13 +41,4 @@ with DAG(
         op_args=[local_path, tickers],  # 로컬 경로와 티커 리스트를 인자로 전달
     )
     
-    upload_to_hadoop_task = HdfsCreateFileOperator(
-        task_id="upload_to_hdfs_task",
-        file_path="/stock_data/^IXIC.csv",  # HDFS 경로
-        data=open(f"{local_path}/^IXIC.csv", "r").read(),  # 파일 내용
-        hdfs_conn_id="hdfs_default",  # Airflow HDFS Connection 설정
-    )
-
-
-    # 작업 의존성 설정
-    fetch_stock_task >> upload_to_hadoop_task
+    fetch_stock_task
