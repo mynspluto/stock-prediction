@@ -267,18 +267,20 @@ def create_ml_features(df):
 
 def prepare_ml_data(df_ml, prediction_days=1):
     """
-    머신러닝 모델을 위한 데이터 준비
+    머신러닝 모델을 위한 데이터 준비 - 기본 가격 데이터만 사용
     """
-    # 특징(X)과 타겟(y) 설정
-    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                      'MA5', 'MA20', 'MA60', 'Volume_MA5',
-                      'Price_Range', 'Price_Change', 'RSI', 'MACD', 'Signal_Line']
-    
+    # 기본 가격 데이터만 사용
+    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
     target_columns = ['Open', 'High', 'Low', 'Close']
     
     # 데이터 시프트하여 다음날 가격을 예측하도록 설정
     X = df_ml[feature_columns].values[:-prediction_days]
     y = df_ml[target_columns].shift(-prediction_days).values[:-prediction_days]
+    
+    # NaN 값 제거
+    valid_idx = ~np.isnan(y).any(axis=1)
+    X = X[valid_idx]
+    y = y[valid_idx]
     
     # 학습/테스트 분할 (80:20)
     split_point = int(len(X) * 0.8)
@@ -312,22 +314,16 @@ def train_stock_model(X_train, y_train):
     model.fit(X_train, y_train)
     return model
 
-def predict_stock_prices(df, model, scalers, days_to_predict=1):
+def predict_stock_prices(df, model, scalers):
     """
-    학습된 모델을 사용하여 주가 예측
+    학습된 모델을 사용하여 주가 예측 - 기본 가격 데이터만 사용
     """
     scaler_X, scaler_y = scalers
     
     # 예측을 위한 마지막 데이터 준비
-    last_data = df.iloc[-days_to_predict:].copy()
+    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
     
-    # 특징 생성
-    df_ml = create_ml_features(df)
-    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
-                      'MA5', 'MA20', 'MA60', 'Volume_MA5',
-                      'Price_Range', 'Price_Change', 'RSI', 'MACD', 'Signal_Line']
-    
-    X_pred = df_ml[feature_columns].values[-days_to_predict:]
+    X_pred = df[feature_columns].values[-1:]
     X_pred_scaled = scaler_X.transform(X_pred)
     
     # 예측
@@ -335,13 +331,13 @@ def predict_stock_prices(df, model, scalers, days_to_predict=1):
     predictions = scaler_y.inverse_transform(predictions_scaled)
     
     # 마지막 날짜 가져오기
-    last_date = pd.to_datetime(last_data['Date'].iloc[-1])
+    last_date = pd.to_datetime(df['Date'].iloc[-1])
     next_date = last_date + pd.Timedelta(days=1)
     
     # 예측 결과를 데이터프레임으로 변환
     pred_df = pd.DataFrame(predictions, 
                           columns=['Pred_Open', 'Pred_High', 'Pred_Low', 'Pred_Close'],
-                          index=[next_date])  # 날짜를 인덱스로 사용
+                          index=[next_date])
     
     return pred_df
 
