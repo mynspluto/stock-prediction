@@ -6,6 +6,15 @@ from datetime import datetime, timedelta
 import pandas as pd
 from hdfs import InsecureClient
 import subprocess
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+import sys
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
 
 local_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
 #webhdfs_url = 'http://localhost:9870/webhdfs/v1'
@@ -35,10 +44,10 @@ def fetch_stock_data(local_path, tickers):
         df = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
 
         # Round numerical columns to integers
-        numerical_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-        for col in numerical_columns:
-            if col in df.columns:
-                df[col] = df[col].round(0).astype(int)
+        # numerical_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        # for col in numerical_columns:
+        #     if col in df.columns:
+        #         df[col] = df[col].round(0).astype(int)
 
         # Save the DataFrame as JSON
         df.to_json(f"{local_path}/{ticker}.json", orient='records', date_format='iso')
@@ -93,20 +102,35 @@ def split_json_by_month(local_path, ticker):
     else:
         print(f"JSON file not found: {json_file_path}")
         
-def upload_json_to_hdfs(local_path, ticker):
-    # local_path에서 모든 JSON 파일 찾기
+def upload_json_to_hdfs(client, local_path, ticker):
+    # Ensure the HDFS directory exists
+    hdfs_base_path = f"/stock-history/{ticker}"
+    try:
+        if not client.status(hdfs_base_path, strict=False):
+            client.makedirs(hdfs_base_path)
+            print(f"Created HDFS directory: {hdfs_base_path}")
+    except Exception as e:
+        print(f"Creating directory {hdfs_base_path}: {str(e)}")
+        client.makedirs(hdfs_base_path)
+
+    # Upload files
     for root, dirs, files in os.walk(f"{local_path}/{ticker}"):
         for file in files:
             if file.endswith('.json'):
-                # 각 JSON 파일 경로
                 local_file_path = os.path.join(root, file)
-
-                # HDFS 경로 설정 (디렉토리 구조를 유지하면서 업로드)
-                hdfs_path = f"/stock-history/{ticker}/{file}"
-
-                # JSON 파일을 HDFS에 업로드
-                client.upload(hdfs_path, local_file_path)
-                print(f"Uploaded {local_file_path} to HDFS path {hdfs_path}")
+                hdfs_path = f"{hdfs_base_path}/{file}"
+                
+                try:
+                    # Check if file exists
+                    if client.status(hdfs_path, strict=False):
+                        print(f"File {hdfs_path} already exists, overwriting...")
+                        client.delete(hdfs_path)
+                    
+                    # Upload the file
+                    client.upload(hdfs_path, local_file_path)
+                    print(f"Uploaded {local_file_path} to HDFS path {hdfs_path}")
+                except Exception as e:
+                    print(f"Error uploading {local_file_path}: {str(e)}")
                 
 
 def combine_stock_files(client, hdfs_input_path, hdfs_output_path):
@@ -159,25 +183,30 @@ def run_hadoop_mapreduce(input_path, output_path):
     """
     HDFS 클라이언트를 통해 하둡 스트리밍 맵리듀스 작업 실행
     """
-    # Hadoop 홈 디렉토리 설정
-    hadoop_home = os.path.expanduser('~/hadoop-3.4.1')
-    hadoop_bin = os.path.join(hadoop_home, 'bin/hadoop')
-    
-    # Hadoop 스트리밍 JAR 파일 경로
-    streaming_jar = os.path.join(hadoop_home, 'share/hadoop/tools/lib/hadoop-streaming-*.jar')
-    streaming_jar = os.popen(f'ls {streaming_jar}').read().strip()
-    
-    # MapReduce 작업 실행 명령어
-    hadoop_command = [
-        hadoop_bin, 'jar', streaming_jar,
-        '-files', './airflow/dags/stock_mapper.py,./airflow/dags/stock_reducer.py',
-        '-mapper', 'python3 stock_mapper.py',
-        '-reducer', 'python3 stock_reducer.py',
-        '-input', input_path,
-        '-output', output_path
-    ]
-    
     try:
+        # Hadoop 홈 디렉토리 설정
+        hadoop_home = os.path.expanduser('~/hadoop-3.4.1')
+        hadoop_bin = os.path.join(hadoop_home, 'bin/hadoop')
+        
+        # Delete output directory if it exists
+        delete_command = [hadoop_bin, 'fs', '-rm', '-r', output_path]
+        subprocess.run(delete_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(f"Cleaned up existing output directory: {output_path}")
+        
+        # Hadoop 스트리밍 JAR 파일 경로
+        streaming_jar = os.path.join(hadoop_home, 'share/hadoop/tools/lib/hadoop-streaming-*.jar')
+        streaming_jar = os.popen(f'ls {streaming_jar}').read().strip()
+        
+        # MapReduce 작업 실행 명령어
+        hadoop_command = [
+            hadoop_bin, 'jar', streaming_jar,
+            '-files', './airflow/dags/stock_mapper.py,./airflow/dags/stock_reducer.py',
+            '-mapper', 'python3 stock_mapper.py',
+            '-reducer', 'python3 stock_reducer.py',
+            '-input', input_path,
+            '-output', output_path
+        ]
+        
         # MapReduce 작업 실행
         process = subprocess.Popen(
             hadoop_command,
@@ -198,22 +227,223 @@ def run_hadoop_mapreduce(input_path, output_path):
     except Exception as e:
         print(f"Error running MapReduce job: {str(e)}")
         raise
+    
+def create_ml_features(df):
+    """
+    주가 데이터프레임에서 머신러닝용 특징 생성
+    """
+    # 기존 데이터 복사
+    df_ml = df.copy()
+    
+    # 이동평균선
+    df_ml['MA5'] = df_ml['Close'].rolling(window=5).mean()
+    df_ml['MA20'] = df_ml['Close'].rolling(window=20).mean()
+    df_ml['MA60'] = df_ml['Close'].rolling(window=60).mean()
+    
+    # 거래량 이동평균
+    df_ml['Volume_MA5'] = df_ml['Volume'].rolling(window=5).mean()
+    
+    # 변동성 지표
+    df_ml['Price_Range'] = df_ml['High'] - df_ml['Low']
+    df_ml['Price_Change'] = df_ml['Close'] - df_ml['Open']
+    
+    # RSI (Relative Strength Index)
+    delta = df_ml['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df_ml['RSI'] = 100 - (100 / (1 + rs))
+    
+    # MACD (Moving Average Convergence Divergence)
+    exp1 = df_ml['Close'].ewm(span=12, adjust=False).mean()
+    exp2 = df_ml['Close'].ewm(span=26, adjust=False).mean()
+    df_ml['MACD'] = exp1 - exp2
+    df_ml['Signal_Line'] = df_ml['MACD'].ewm(span=9, adjust=False).mean()
+    
+    # 결측값 처리
+    df_ml = df_ml.fillna(method='bfill')
+    
+    return df_ml
 
+def prepare_ml_data(df_ml, prediction_days=1):
+    """
+    머신러닝 모델을 위한 데이터 준비
+    """
+    # 특징(X)과 타겟(y) 설정
+    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                      'MA5', 'MA20', 'MA60', 'Volume_MA5',
+                      'Price_Range', 'Price_Change', 'RSI', 'MACD', 'Signal_Line']
+    
+    target_columns = ['Open', 'High', 'Low', 'Close']
+    
+    # 데이터 시프트하여 다음날 가격을 예측하도록 설정
+    X = df_ml[feature_columns].values[:-prediction_days]
+    y = df_ml[target_columns].shift(-prediction_days).values[:-prediction_days]
+    
+    # 학습/테스트 분할 (80:20)
+    split_point = int(len(X) * 0.8)
+    X_train = X[:split_point]
+    X_test = X[split_point:]
+    y_train = y[:split_point]
+    y_test = y[split_point:]
+    
+    # 데이터 정규화
+    scaler_X = StandardScaler()
+    scaler_y = StandardScaler()
+    
+    X_train = scaler_X.fit_transform(X_train)
+    X_test = scaler_X.transform(X_test)
+    
+    y_train = scaler_y.fit_transform(y_train)
+    y_test = scaler_y.transform(y_test)
+    
+    return (X_train, X_test, y_train, y_test), (scaler_X, scaler_y)
 
+def train_stock_model(X_train, y_train):
+    """
+    주가 예측 모델 학습
+    """
+    model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=10,
+        random_state=42,
+        n_jobs=-1  # 모든 CPU 코어 사용
+    )
+    model.fit(X_train, y_train)
+    return model
+
+def predict_stock_prices(df, model, scalers, days_to_predict=1):
+    """
+    학습된 모델을 사용하여 주가 예측
+    """
+    scaler_X, scaler_y = scalers
+    
+    # 예측을 위한 마지막 데이터 준비
+    last_data = df.iloc[-days_to_predict:].copy()
+    
+    # 특징 생성
+    df_ml = create_ml_features(df)
+    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 
+                      'MA5', 'MA20', 'MA60', 'Volume_MA5',
+                      'Price_Range', 'Price_Change', 'RSI', 'MACD', 'Signal_Line']
+    
+    X_pred = df_ml[feature_columns].values[-days_to_predict:]
+    X_pred_scaled = scaler_X.transform(X_pred)
+    
+    # 예측
+    predictions_scaled = model.predict(X_pred_scaled)
+    predictions = scaler_y.inverse_transform(predictions_scaled)
+    
+    # 마지막 날짜 가져오기
+    last_date = pd.to_datetime(last_data['Date'].iloc[-1])
+    next_date = last_date + pd.Timedelta(days=1)
+    
+    # 예측 결과를 데이터프레임으로 변환
+    pred_df = pd.DataFrame(predictions, 
+                          columns=['Pred_Open', 'Pred_High', 'Pred_Low', 'Pred_Close'],
+                          index=[next_date])  # 날짜를 인덱스로 사용
+    
+    return pred_df
+
+def evaluate_predictions(y_true, y_pred, scalers):
+    """
+    예측 결과 평가
+    """
+    _, scaler_y = scalers
+    
+    # 스케일링된 데이터를 원래 스케일로 변환
+    y_true = scaler_y.inverse_transform(y_true)
+    y_pred = scaler_y.inverse_transform(y_pred)
+    
+    # 각 가격 유형별 RMSE 계산
+    price_types = ['Open', 'High', 'Low', 'Close']
+    metrics = {}
+    
+    for i, price_type in enumerate(price_types):
+        rmse = np.sqrt(mean_squared_error(y_true[:, i], y_pred[:, i]))
+        mae = mean_absolute_error(y_true[:, i], y_pred[:, i])
+        mape = np.mean(np.abs((y_true[:, i] - y_pred[:, i]) / y_true[:, i])) * 100
         
+        metrics[price_type] = {
+            'RMSE': rmse,
+            'MAE': mae,
+            'MAPE': mape
+        }
+    
+    return metrics
+
+def run_stock_prediction(df):
+    """
+    전체 주가 예측 프로세스 실행
+    """
+    try:
+        # 1. 특징 생성
+        print("특징 생성 중...")
+        df_ml = create_ml_features(df)
+        
+        # 2. 데이터 준비
+        print("데이터 준비 중...")
+        (X_train, X_test, y_train, y_test), scalers = prepare_ml_data(df_ml)
+        
+        # 3. 모델 학습
+        print("모델 학습 중...")
+        model = train_stock_model(X_train, y_train)
+        
+        # 4. 예측 수행
+        print("예측 수행 중...")
+        y_pred = model.predict(X_test)
+        
+        # 5. 성능 평가
+        print("성능 평가 중...")
+        metrics = evaluate_predictions(y_test, y_pred, scalers)
+        
+        # 6. 다음 거래일 예측
+        next_day_pred = predict_stock_prices(df, model, scalers)
+        
+        return {
+            'model': model,
+            'metrics': metrics,
+            'next_day_prediction': next_day_pred,
+            'feature_importance': dict(zip(df_ml.columns, model.feature_importances_))
+        }
+        
+    except Exception as e:
+        print(f"예측 중 오류 발생: {str(e)}")
+        raise
+
 #ticker = '^IXIC'
 # fetch_stock_data(local_path, tickers)
 # print_json_records(local_path, tickers[0])
 # split_json_by_month(local_path, tickers[0])
 
-client = InsecureClient('http://localhost:9870', user='hadoop')
-#upload_json_to_hdfs(local_path, tickers[0])
+# client = InsecureClient('http://localhost:9870', user='hadoop')
+# upload_json_to_hdfs(client, local_path, tickers[0])
 
 # input_path = '/stock-history/^IXIC'
-# output_path = '/stock-history/^IXIC/combined.json'
-# combine_stock_files(client, input_path, output_path)
+# output_path = '/stock-history/^IXIC/combined_mapreduce'
+# run_hadoop_mapreduce(input_path, output_path)
+#~/hadoop-3.4.1/bin/hdfs dfs -cat /stock-history/^IXIC/combined_mapreduce/part-00000
 
-input_path = '/stock-history/^IXIC'
-output_path = '/stock-history/^IXIC/combined_mapreduce'
-run_hadoop_mapreduce(input_path, output_path)
-#./hdfs dfs -cat /stock-history/^IXIC/combined_mapreduce/part-00000
+
+
+# 주가 데이터를 데이터프레임으로 변환
+df = pd.read_json(f"{local_path}/{tickers[0]}.json")
+
+# 머신러닝 예측 실행
+prediction_results = run_stock_prediction(df)
+
+# 결과 출력
+print("\n=== 예측 성능 평가 ===")
+for price_type, metrics in prediction_results['metrics'].items():
+    print(f"\n{price_type}:")
+    for metric_name, value in metrics.items():
+        print(f"{metric_name}: {value:.2f}")
+
+print("\n=== 다음 거래일 예측 ===")
+print(prediction_results['next_day_prediction'])
+
+print("\n=== 특징 중요도 (상위 5개) ===")
+importance = sorted(prediction_results['feature_importance'].items(), 
+                   key=lambda x: x[1], reverse=True)[:5]
+for feature, score in importance:
+    print(f"{feature}: {score:.4f}")

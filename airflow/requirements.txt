@@ -8,3 +8,4 @@ asgiref==2.3.0
 requests==2.31.0
 pendulum==3.0.0
 yfinance==0.2.51
+scikit-learn
