@@ -3,20 +3,23 @@ import yfinance as yf
 import pandas as pd
 import json
 
+from hdfs import InsecureClient
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-local_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
+stock_data_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
+hadoop_url = 'http://localhost:9870'
+hdfs_base_path = "/stock-history"
 tickers = ['^IXIC']
 
-def fetch_stock_data(local_path, tickers):
-    if not os.path.exists(local_path):
-        os.makedirs(local_path)
+def fetch_stock_data(stock_data_path, tickers):
+    if not os.path.exists(stock_data_path):
+        os.makedirs(stock_data_path)
     
     for ticker in tickers:
         # 가장 최근 데이터 날짜 확인
-        ticker_directory = f"{local_path}/{ticker}"
+        ticker_directory = f"{stock_data_path}/{ticker}"
         last_date = get_last_date(ticker_directory)
         
         # yfinance에서 데이터 가져오기
@@ -99,10 +102,10 @@ def save_to_monthly_files(df, ticker_directory, ticker):
             print(f"Created new file for {ticker} for {year_month} in {month_file_path}")
 
 
-def split_json_by_month(local_path, tickers):
+def split_json_by_month(stock_data_path, tickers):
     for ticker in tickers:
-        json_file_path = f"{local_path}/{ticker}.json"
-        ticker_directory = f"{local_path}/{ticker}"
+        json_file_path = f"{stock_data_path}/{ticker}.json"
+        ticker_directory = f"{stock_data_path}/{ticker}"
 
         # Check if the JSON file exists
         if os.path.exists(json_file_path):
@@ -134,9 +137,40 @@ def split_json_by_month(local_path, tickers):
                 print(f"Data for {ticker} for {year_month} saved to {month_file_path}")
         else:
             print(f"JSON file not found: {json_file_path}")
+            
+def upload_json_to_hdfs(stock_data_path, tickers):
+    client = InsecureClient(hadoop_url, user='hadoop')
+    for ticker in tickers:
+        hdfs_ticker_data_path = f"{hdfs_base_path}/{ticker}"
+        try:
+            if not client.status(hdfs_ticker_data_path, strict=False):
+                client.makedirs(hdfs_ticker_data_path)
+                print(f"Created HDFS directory: {hdfs_ticker_data_path}")
+        except Exception as e:
+            print(f"Creating directory {hdfs_ticker_data_path}: {str(e)}")
+            client.makedirs(hdfs_ticker_data_path)
+
+        # Upload files
+        for root, dirs, files in os.walk(f"{stock_data_path}/{ticker}"):
+            for file in files:
+                if file.endswith('.json'):
+                    local_file_path = os.path.join(root, file)
+                    hdfs_path = f"{hdfs_ticker_data_path}/{file}"
+                    
+                    try:
+                        # Check if file exists
+                        if client.status(hdfs_path, strict=False):
+                            print(f"File {hdfs_path} already exists, overwriting...")
+                            client.delete(hdfs_path)
+                        
+                        # Upload the file
+                        client.upload(hdfs_path, local_file_path)
+                        print(f"Uploaded {local_file_path} to HDFS path {hdfs_path}")
+                    except Exception as e:
+                        print(f"Error uploading {local_file_path}: {str(e)}")
 
 with DAG(
-    "download_stock_data",
+    "download_upload_stock_data",
     default_args={
         "owner": "airflow",
         "depend_on_past": False,
@@ -152,16 +186,22 @@ with DAG(
     tags=["example"],
 ) as dag:
     
-    fetch_stock_data_task = PythonOperator(
-        task_id="fetch_stock_data_task",
+    download_stock_data_task = PythonOperator(
+        task_id="download_stock_data_task",
         python_callable=fetch_stock_data,
-        op_args=[local_path, tickers],
+        op_args=[stock_data_path, tickers],
     )
     
-    split_stock_data_by_month = PythonOperator(
-        task_id="split_stock_data_by_month_task",
+    split_save_stock_data_by_month = PythonOperator(
+        task_id="split_save_stock_data_by_month_task",
         python_callable=split_json_by_month,
-        op_args=[local_path, tickers],
+        op_args=[stock_data_path, tickers],
     )
     
-    fetch_stock_data_task >> split_stock_data_by_month
+    upload_stock_data_to_hdfs = PythonOperator(
+        task_id="upload_json_to_hdfs_task",
+        python_callable=upload_json_to_hdfs,
+        op_args=[stock_data_path, tickers],
+    )
+    
+    download_stock_data_task >> split_save_stock_data_by_month >> upload_stock_data_to_hdfs

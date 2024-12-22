@@ -4,7 +4,7 @@ rm -rf ~/airflow/dags
 rm -rf ~/airflow/logs
 mkdir -p ~/airflow/dags
 
-cp ./airflow/dags/download_stock_data.py ~/airflow/dags/download_stock_data.py
+cp ./airflow/dags/download_upload_stock_data.py ~/airflow/dags/download_upload_stock_data.py
 
 python3.12 -m venv ./airflow/airflow_env
 source ./airflow/airflow_env/bin/activate
