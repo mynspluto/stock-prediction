@@ -1,7 +1,11 @@
-#!/bin/zsh
+#!/bin/bash
 #docker exec -it namenode hadoop fs -chmod -R 777 /
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 cd /home/mynspluto/hadoop-3.4.1
 bin/hadoop fs -chmod -R 777 /
+
+cd "${SCRIPT_DIR}"
 
 curl -i 'http://localhost:9870/webhdfs/v1/?op=LISTSTATUS'
 curl -i -X PUT 'http://localhost:9870/webhdfs/v1/airflow/test_data?op=MKDIRS'
