@@ -19,6 +19,7 @@ from sklearn.preprocessing import StandardScaler
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from io import BytesIO
 
 stock_data_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
 hadoop_url = 'http://localhost:9870'
@@ -31,11 +32,10 @@ def run_hadoop_mapreduce(tickers):
     HDFS 클라이언트를 통해 하둡 스트리밍 맵리듀스 작업 실행
     """
     for ticker in tickers:
-
-      input_path = f'{hdfs_path}/{ticker}'
-      output_path = f'{hdfs_path}/{ticker}/combined_mapreduce'
-    
       try:
+        input_path = f'{hdfs_path}/{ticker}/monthly/*'
+        output_path = f'{hdfs_path}/{ticker}/combined_mapreduce'
+      
         # Hadoop 홈 디렉토리 설정
         hadoop_bin = os.path.join(hadoop_home, 'bin/hadoop')
         
@@ -83,6 +83,8 @@ def run_hadoop_mapreduce(tickers):
       except Exception as e:
           print(f"Error running MapReduce job: {str(e)}")
           raise
+    
+    return 1
       
 def create_ml_features(df):
     """
@@ -304,16 +306,12 @@ def read_combined_data_from_hdfs(ticker):
         raise
 
 def save_model_results_to_hdfs(ticker, results):
-    """
-    모델 결과를 HDFS에 저장
-    """
+    """모델 결과를 HDFS에 저장"""
     try:
         client = InsecureClient(hadoop_url)
-        
-        # 결과를 저장할 경로
         model_path = f'{hdfs_path}/{ticker}/model_results'
         
-        # next_day_prediction DataFrame을 JSON 직렬화 가능한 형식으로 변환
+        # next_day_prediction DataFrame을 JSON 직렬화
         next_day_pred_dict = {}
         for col in results['next_day_prediction'].columns:
             next_day_pred_dict[col] = results['next_day_prediction'][col].iloc[0]
@@ -330,9 +328,18 @@ def save_model_results_to_hdfs(ticker, results):
         # JSON으로 변환
         results_json = json.dumps(results_dict)
         
-        # HDFS에 저장
-        with client.write(f'{model_path}/latest_results.json', encoding='utf-8') as writer:
-            writer.write(results_json)
+        # 임시 파일 생성
+        temp_path = '/tmp/latest_results.json'
+        with open(temp_path, 'w') as f:
+            f.write(results_json)
+        
+        # HDFS에 업로드
+        client.upload(f'{model_path}/latest_results.json', 
+                     temp_path,
+                     overwrite=True)
+        
+        # 임시 파일 삭제
+        os.remove(temp_path)
             
         print(f"모델 결과가 성공적으로 저장됨: {model_path}/latest_results.json")
         print(f"저장된 예측 결과: {next_day_pred_dict}")
@@ -366,7 +373,7 @@ def process_stock_predictions(**context):
         raise
 
 with DAG(
-    "update_stock_prediction_model",
+    "update_stock_prediction_model_2",
     default_args={
         "owner": "airflow",
         "depend_on_past": False,
@@ -388,7 +395,7 @@ with DAG(
         python_callable=run_hadoop_mapreduce,
         op_args=[tickers],
     )
-
+    
     run_prediction = PythonOperator(
         task_id="run_stock_prediction",
         python_callable=process_stock_predictions,

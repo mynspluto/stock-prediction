@@ -141,7 +141,7 @@ def split_json_by_month(stock_data_path, tickers):
 def upload_json_to_hdfs(stock_data_path, tickers):
     client = InsecureClient(hadoop_url, user='hadoop')
     for ticker in tickers:
-        hdfs_ticker_data_path = f"{hdfs_base_path}/{ticker}"
+        hdfs_ticker_data_path = f"{hdfs_base_path}/{ticker}/monthly"
         try:
             if not client.status(hdfs_ticker_data_path, strict=False):
                 client.makedirs(hdfs_ticker_data_path)
