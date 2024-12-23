@@ -1,1 +1,0 @@
-/tmp/hadoop-mynspluto/mapred/local/job_local1996561707_0001_3829c20e-12b3-44c0-add4-d66c4eb7b6b2/stock_reducer.py
