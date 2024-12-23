@@ -1,0 +1,1 @@
+/tmp/hadoop-mynspluto/mapred/local/job_local1996561707_0001_a379cd72-a4f0-464b-a905-b9b47e649169/stock_mapper.py
