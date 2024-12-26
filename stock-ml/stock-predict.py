@@ -53,30 +53,29 @@ def prepare_ml_data(df_ml, window_size=252):  # 1년치 거래일 기준
     시간에 따른 추세를 고려한 데이터 준비
     """
     # 기본 특징 설정
-    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-    target_columns = ['Open', 'High', 'Low', 'Close']
-    
-    # 최근 데이터만 사용
-    df_recent = df_ml.tail(window_size).copy()
-    
+    feature_columns = ['Close', 'Volume']
+    target_columns = ['Close']
+
     # 퍼센트 변화율 계산
-    df_pct = df_recent[feature_columns].pct_change()
+    df_pct = df_ml[feature_columns].pct_change()
     df_pct = df_pct.fillna(0)
     
     # 입력 데이터와 타겟 데이터 준비
     X = df_pct[feature_columns].values[:-1]  # 마지막 날 제외
+    print('X', X)
     
     # 다음날 가격 변화율을 타겟으로
     y_pct = df_pct[target_columns].shift(-1).values[:-1]
     
     # 학습/테스트 분할 (80:20)
-    split_point = int(len(X) * 0.8)
+    # split_point = int(len(X) * 0.8)
+    split_point = int(len(X))
     X_train = X[:split_point]
     X_test = X[split_point:]
     y_train = y_pct[:split_point]
     y_test = y_pct[split_point:]
     
-    return (X_train, X_test, y_train, y_test), df_recent
+    return (X_train, X_test, y_train, y_test), df_ml
 
 def train_stock_model(X_train, y_train):
     """
@@ -234,27 +233,82 @@ local_path = '/home/mynspluto/Project/stock-prediction/stock-ml'
 
 df = pd.read_json(f"{local_path}/^IXIC.json")
 df['Date'] = pd.to_datetime(df['Date'])
-#df = df[df['Date'] >= '1990-01-01'].copy()
+df = df[df['Date'] >= '2024-12-10'].copy()
 
-# 최근 데이터 확인
-print("\n=== 최근 데이터 확인 ===")
-print(df.tail()[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']])
 
-# 예측 실행
-prediction_results = run_stock_prediction(df)
+print("====데이터=====")
+print(df[['Date', 'Close', 'Volume']])
 
-# 결과 출력
-print("\n=== 예측 성능 평가 ===")
-for price_type, metrics in prediction_results['metrics'].items():
-    print(f"\n{price_type}:")
-    for metric_name, value in metrics.items():
-        print(f"{metric_name}: {value:.2f}")
 
-print("\n=== 다음 거래일 예측 ===")
-print(prediction_results['next_day_prediction'])
+(X_train, X_test, y_train, y_test), last_data = prepare_ml_data(df)
+print("====학습 X====")
+print(X_train)
+print("====학습 Y====")
+print(y_train)
 
-print("\n=== 특징 중요도 (상위 5개) ===")
-importance = sorted(prediction_results['feature_importance'].items(), 
-                   key=lambda x: x[1], reverse=True)[:5]
-for feature, score in importance:
-    print(f"{feature}: {score:.4f}")
+print("====테스트 X====")
+print(X_test)
+print("====테스트 Y====")
+print(y_test)
+
+
+print("모델 학습 중...")
+model = train_stock_model(X_train, y_train)
+
+print("예측 수행 중...")
+y_pred = model.predict(X_test)
+
+# 성능 평가
+# metrics = {}
+# price_types = ['Open', 'High', 'Low', 'Close']
+# for i, price_type in enumerate(price_types):
+#     last_prices = last_data[price_type].values[:-1]
+#     y_true_prices = last_prices[-len(y_test):] * (1 + y_test[:, i])
+#     y_pred_prices = last_prices[-len(y_test):] * (1 + y_pred[:, i])
+    
+#     rmse = np.sqrt(mean_squared_error(y_true_prices, y_pred_prices))
+#     mae = mean_absolute_error(y_true_prices, y_pred_prices)
+#     mape = np.mean(np.abs((y_true_prices - y_pred_prices) / y_true_prices)) * 100
+    
+#     metrics[price_type] = {
+#         'RMSE': rmse,
+#         'MAE': mae,
+#         'MAPE': mape
+#     }
+
+# # 다음 거래일 예측
+# next_day_pred = predict_next_day(df, model)
+
+# feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+# feature_importance = dict(zip(feature_columns, model.feature_importances_))
+
+# # 예측 신뢰도 계산
+# confidence = 1 - np.mean([m['MAPE']/100 for m in metrics.values()])
+
+# print(f"\n예측 신뢰도: {confidence:.2%}")
+# print("\n=== 최근 실제 가격 ===")
+# print(df.tail(1)[['Date', 'Open', 'High', 'Low', 'Close']])
+
+# prediction_results =  {
+#     'model': model,
+#     'metrics': metrics,
+#     'next_day_prediction': next_day_pred,
+#     'feature_importance': feature_importance,
+#     'confidence': confidence
+# }
+
+# # 결과 출력
+# print("\n=== 예측 성능 평가 ===")
+# for price_type, metrics in prediction_results['metrics'].items():
+#     print(f"\n{price_type}:")
+#     for metric_name, value in metrics.items():
+#         print(f"{metric_name}: {value:.2f}")
+
+# print("\n=== 다음 거래일 예측 ===")
+# print(prediction_results['next_day_prediction'])
+
+# print("\n=== 특징 중요도 (상위 5개) ===")
+# importance = sorted(prediction_results['feature_importance'].items(), 
+#                    key=lambda x: x[1], reverse=True)[:5]
+# for feature, score in importance:
+#     print(f"{feature}: {score:.4f}")
