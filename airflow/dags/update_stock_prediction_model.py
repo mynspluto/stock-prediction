@@ -28,6 +28,14 @@ hdfs_path = "/stock-history"
 hadoop_home = "/home/mynspluto/hadoop-3.4.1"
 tickers = ['^IXIC']
 
+FEATURE_COLUMNS = [
+    'Close', 
+    'Volume',
+    'MACD',
+    'Signal_Line'
+]
+TARGET_COLUMNS = ['Close']
+    
 def run_hadoop_mapreduce(tickers):
     """
     HDFS 클라이언트를 통해 하둡 스트리밍 맵리듀스 작업 실행
@@ -132,13 +140,10 @@ def prepare_ml_data(df_ml, prediction_days=1):
     """
     머신러닝 모델을 위한 데이터 준비 - 기본 가격 데이터만 사용
     """
-    # 기본 특징 설정
-    feature_columns = ['Close', 'Volume']
-    target_columns = ['Close']
     
     # 데이터 시프트하여 다음날 가격을 예측하도록 설정
-    X = df_ml[feature_columns].values[:-prediction_days]
-    y = df_ml[target_columns].shift(-prediction_days).values[:-prediction_days]
+    X = df_ml[FEATURE_COLUMNS].values[:-prediction_days]
+    y = df_ml[TARGET_COLUMNS].shift(-prediction_days).values[:-prediction_days]
     
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -179,10 +184,8 @@ def predict_stock_prices(df, model, scalers):
     """
     scaler_X, scaler_y = scalers
     
-    # 예측을 위한 마지막 데이터 준비
-    feature_columns = ['Close', 'Volume']
     
-    X_pred = df[feature_columns].values[-1:]  # 이미 2D
+    X_pred = df[FEATURE_COLUMNS].values[-1:]  # 이미 2D
     X_pred_scaled = scaler_X.transform(X_pred)
     
     # 예측
@@ -300,15 +303,15 @@ def run_stock_prediction(df):
         print("성능 평가 중...")
         metrics = evaluate_predictions(y_test, y_pred, scalers)
         
-        # 6. 다음 거래일 예측
-        next_day_pred = predict_stock_prices(df, model, scalers)
+        # 6. 다음 거래일 예측 (df 대신 df_ml 사용)
+        next_day_pred = predict_stock_prices(df_ml, model, scalers)
         
         return {
             'model': model,
-            'scalers': scalers,  # 스케일러도 함께 반환
+            'scalers': scalers,
             'metrics': metrics,
             'next_day_prediction': next_day_pred,
-            'feature_importance': dict(zip(df_ml.columns, model.feature_importances_))
+            'feature_importance': dict(zip(FEATURE_COLUMNS, model.feature_importances_))  # df_ml.columns 대신 FEATURE_COLUMNS 사용
         }
         
     except Exception as e:
@@ -495,9 +498,9 @@ def run_model_prediction(**context):
             df = get_latest_stock_data(ticker)
             
             # 3. 특징 생성
-            df_ml = create_ml_features(df)
+            df_ml = create_ml_features(df)  # df_ml 생성
             
-            # 4. 다음 거래일 예측
+            # 4. 다음 거래일 예측 (df 대신 df_ml 사용)
             next_day_pred = predict_stock_prices(df_ml, model, scalers)
             
             # 5. 예측 결과 저장
@@ -510,7 +513,7 @@ def run_model_prediction(**context):
         raise
 
 with DAG(
-    "update_stock_prediction_model_2",
+    "update_stock_prediction_model",
     default_args={
         "owner": "airflow",
         "depend_on_past": False,
