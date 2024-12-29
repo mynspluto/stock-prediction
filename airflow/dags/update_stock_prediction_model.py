@@ -10,11 +10,10 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import train_test_split
 
 import sys
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
 
 
 from airflow import DAG
@@ -87,7 +86,7 @@ def run_hadoop_mapreduce(tickers):
           raise
     
     return 1
-      
+
 def create_ml_features(df):
     """
     주가 데이터프레임에서 머신러닝용 특징 생성
@@ -106,6 +105,10 @@ def create_ml_features(df):
     # 변동성 지표
     df_ml['Price_Range'] = df_ml['High'] - df_ml['Low']
     df_ml['Price_Change'] = df_ml['Close'] - df_ml['Open']
+    
+    # 가격변동률 추가
+    df_ml['Daily_Return'] = df_ml['Close'].pct_change() * 100  # 일일 변동률
+    df_ml['Weekly_Return'] = df_ml['Close'].pct_change(periods=5) * 100  # 주간 변동률
     
     # RSI (Relative Strength Index)
     delta = df_ml['Close'].diff()
@@ -129,35 +132,29 @@ def prepare_ml_data(df_ml, prediction_days=1):
     """
     머신러닝 모델을 위한 데이터 준비 - 기본 가격 데이터만 사용
     """
-    # 기본 가격 데이터만 사용
-    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-    target_columns = ['Open', 'High', 'Low', 'Close']
+    # 기본 특징 설정
+    feature_columns = ['Close', 'Volume']
+    target_columns = ['Close']
     
     # 데이터 시프트하여 다음날 가격을 예측하도록 설정
     X = df_ml[feature_columns].values[:-prediction_days]
     y = df_ml[target_columns].shift(-prediction_days).values[:-prediction_days]
     
-    # NaN 값 제거
-    valid_idx = ~np.isnan(y).any(axis=1)
-    X = X[valid_idx]
-    y = y[valid_idx]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
     
-    # 학습/테스트 분할 (80:20)
-    split_point = int(len(X) * 0.8)
-    X_train = X[:split_point]
-    X_test = X[split_point:]
-    y_train = y[:split_point]
-    y_test = y[split_point:]
-    
-    # 데이터 정규화
+    # Then scale the features
     scaler_X = StandardScaler()
     scaler_y = StandardScaler()
     
+    # Fit and transform training data
     X_train = scaler_X.fit_transform(X_train)
-    X_test = scaler_X.transform(X_test)
+    y_train = scaler_y.fit_transform(y_train.reshape(-1, 1)).ravel()
     
-    y_train = scaler_y.fit_transform(y_train)
-    y_test = scaler_y.transform(y_test)
+    # Transform test data using the fitted scalers
+    X_test = scaler_X.transform(X_test)
+    y_test = scaler_y.transform(y_test.reshape(-1, 1)).ravel()
     
     return (X_train, X_test, y_train, y_test), (scaler_X, scaler_y)
 
@@ -166,12 +163,14 @@ def train_stock_model(X_train, y_train):
     주가 예측 모델 학습
     """
     model = RandomForestRegressor(
-        n_estimators=100,
-        max_depth=10,
+    n_estimators=200,
+        max_depth=15,
+        min_samples_split=5,
+        min_samples_leaf=2,
         random_state=42,
-        n_jobs=-1  # 모든 CPU 코어 사용
+        n_jobs=-1
     )
-    model.fit(X_train, y_train)
+    model.fit(X_train, y_train.ravel())
     return model
 
 def predict_stock_prices(df, model, scalers):
@@ -181,13 +180,15 @@ def predict_stock_prices(df, model, scalers):
     scaler_X, scaler_y = scalers
     
     # 예측을 위한 마지막 데이터 준비
-    feature_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+    feature_columns = ['Close', 'Volume']
     
-    X_pred = df[feature_columns].values[-1:]
+    X_pred = df[feature_columns].values[-1:]  # 이미 2D
     X_pred_scaled = scaler_X.transform(X_pred)
     
     # 예측
     predictions_scaled = model.predict(X_pred_scaled)
+    # 1D 배열을 2D로 reshape
+    predictions_scaled = predictions_scaled.reshape(-1, 1)
     predictions = scaler_y.inverse_transform(predictions_scaled)
     
     # 마지막 날짜 가져오기
@@ -196,7 +197,7 @@ def predict_stock_prices(df, model, scalers):
     
     # 예측 결과를 데이터프레임으로 변환
     pred_df = pd.DataFrame(predictions, 
-                          columns=['Pred_Open', 'Pred_High', 'Pred_Low', 'Pred_Close'],
+                          columns=['Pred_Close'],
                           index=[next_date])
     
     return pred_df
@@ -207,27 +208,28 @@ def evaluate_predictions(y_true, y_pred, scalers):
     """
     _, scaler_y = scalers
     
+    # 1차원 배열을 2차원으로 reshape
+    y_true = y_true.reshape(-1, 1)
+    y_pred = y_pred.reshape(-1, 1)
+    
     # 스케일링된 데이터를 원래 스케일로 변환
     y_true = scaler_y.inverse_transform(y_true)
     y_pred = scaler_y.inverse_transform(y_pred)
     
-    # 각 가격 유형별 RMSE 계산
-    price_types = ['Open', 'High', 'Low', 'Close']
-    metrics = {}
+    # 평가 지표 계산
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    mae = mean_absolute_error(y_true, y_pred)
+    mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
     
-    for i, price_type in enumerate(price_types):
-        rmse = np.sqrt(mean_squared_error(y_true[:, i], y_pred[:, i]))
-        mae = mean_absolute_error(y_true[:, i], y_pred[:, i])
-        mape = np.mean(np.abs((y_true[:, i] - y_pred[:, i]) / y_true[:, i])) * 100
-        
-        metrics[price_type] = {
-            'RMSE': rmse,
-            'MAE': mae,
-            'MAPE': mape
+    metrics = {
+        'Close': {
+            'RMSE': float(rmse),  # numpy float를 Python float로 변환
+            'MAE': float(mae),
+            'MAPE': float(mape)
         }
+    }
     
     return metrics
-
 def save_model_to_hdfs(ticker, model, scalers):
     """모델과 스케일러를 HDFS에 저장"""
     try:
@@ -451,9 +453,6 @@ def save_prediction_results(ticker, predictions, timestamp):
             'prediction_date': timestamp.strftime('%Y-%m-%d'),
             'timestamp': timestamp.isoformat(),
             'predictions': {
-                'Open': float(predictions['Pred_Open'].iloc[0]),
-                'High': float(predictions['Pred_High'].iloc[0]),
-                'Low': float(predictions['Pred_Low'].iloc[0]),
                 'Close': float(predictions['Pred_Close'].iloc[0])
             }
         }
@@ -521,7 +520,8 @@ with DAG(
         "retry_delay": timedelta(minutes=5),
     },
     description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 모델 져장",
-    schedule=timedelta(days=1),
+    schedule=None,  # 자동 실행 비활성화
+    #schedule=timedelta(days=1),
     start_date=datetime(2021, 1, 1),
     catchup=False,
     tags=["example"],
