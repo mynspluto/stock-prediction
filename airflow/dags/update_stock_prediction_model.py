@@ -18,6 +18,7 @@ import numpy as np
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.decorators import dag, task
 from io import BytesIO
 
 import joblib
@@ -512,7 +513,7 @@ def run_model_prediction(**context):
         print(f"예측 실행 중 오류 발생: {str(e)}")
         raise
 
-with DAG(
+@dag(
     "update_stock_prediction_model",
     default_args={
         "owner": "airflow",
@@ -522,30 +523,63 @@ with DAG(
         "retries": 1,
         "retry_delay": timedelta(minutes=5),
     },
-    description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 모델 져장",
-    schedule=None,  # 자동 실행 비활성화
-    #schedule=timedelta(days=1),
+    description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 모델 저장",
+    schedule=None,
     start_date=datetime(2021, 1, 1),
     catchup=False,
     tags=["example"],
-) as dag:
+)
+def stock_prediction_dag():
+    
+    @task
+    def merge_stock_data():
+        """MapReduce를 통해 주가 데이터 병합"""
+        return run_hadoop_mapreduce(tickers)
+    
+    @task
+    def train_and_save_model(merge_complete):
+        """모델 학습 및 저장"""
+        for ticker in tickers:
+            print(f"{ticker} 데이터 읽는 중...")
+            df = read_combined_data_from_hdfs(ticker)
+            
+            print(f"{ticker} 예측 모델 실행 중...")
+            results = run_stock_prediction(df)
+            
+            print(f"{ticker} 모델 저장 중...")
+            save_model_to_hdfs(ticker, results['model'], results['scalers'])
+            
+            print(f"{ticker} 결과 저장 중...")
+            save_model_results_to_hdfs(ticker, results)
+            
+            print(f"{ticker} 처리 완료")
+        
+        return True
+    
+    @task
+    def predict_next_day(training_complete):
+        """다음날 주가 예측"""
+        client = InsecureClient(hadoop_url)
+        timestamp = datetime.now()
+        
+        for ticker in tickers:
+            print(f"{ticker} 예측 시작...")
+            
+            model, scalers = load_model_from_hdfs(client, ticker)
+            df = get_latest_stock_data(ticker)
+            df_ml = create_ml_features(df)
+            
+            next_day_pred = predict_stock_prices(df_ml, model, scalers)
+            save_prediction_results(ticker, next_day_pred, timestamp)
+            
+            print(f"{ticker} 예측 완료")
+            
+        return True
 
-    #~/hadoop-3.4.1/bin/hdfs dfs -cat /stock-history/^IXIC/combined_mapreduce/part-00000
-    merge_stock_data = PythonOperator(
-        task_id="merge_stock_data_mapreduce",
-        python_callable=run_hadoop_mapreduce,
-        op_args=[tickers],
-    )
-    
-    run_prediction = PythonOperator(
-        task_id="run_stock_prediction",
-        python_callable=process_stock_predictions,
-    )
-    
-    run_saved_model = PythonOperator(
-        task_id="run_saved_model_prediction",
-        python_callable=run_model_prediction,
-    )
+    # Task 의존성 설정
+    merge_complete = merge_stock_data()
+    training_complete = train_and_save_model(merge_complete)
+    predict_next_day(training_complete)
 
-    
-    merge_stock_data >> run_prediction >> run_saved_model
+# DAG 생성
+stock_prediction_dag()
