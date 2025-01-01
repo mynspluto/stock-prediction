@@ -1,27 +1,25 @@
 import os
-import yfinance as yf
 import json
-import requests
+import subprocess
+
 from datetime import datetime, timedelta
+from io import BytesIO
+import joblib
+
+import numpy as np
 import pandas as pd
 from hdfs import InsecureClient
-import subprocess
-import numpy as np
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
 
-import sys
-import numpy as np
-
-
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.decorators import dag, task
-from io import BytesIO
 
-import joblib
+import yfinance as yf
 
 stock_data_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
 hadoop_url = 'http://localhost:9870'
@@ -234,6 +232,7 @@ def evaluate_predictions(y_true, y_pred, scalers):
     }
     
     return metrics
+
 def save_model_to_hdfs(ticker, model, scalers):
     """모델과 스케일러를 HDFS에 저장"""
     try:
@@ -259,64 +258,6 @@ def save_model_to_hdfs(ticker, model, scalers):
         
     except Exception as e:
         print(f"모델 저장 실패: {str(e)}")
-        raise
-
-def load_model_from_hdfs(client, ticker):
-    """HDFS에서 저장된 모델과 스케일러 로드"""
-    try:
-        model_path = f'{hdfs_path}/{ticker}/model'
-        
-        # 모델 파일 읽기
-        with client.read(f'{model_path}/model.joblib') as reader:
-            model_bytes = reader.read()
-        model = joblib.load(BytesIO(model_bytes))
-        
-        # 스케일러 파일 읽기
-        with client.read(f'{model_path}/scalers.joblib') as reader:
-            scalers_bytes = reader.read()
-        scalers = joblib.load(BytesIO(scalers_bytes))
-        
-        return model, scalers
-    except Exception as e:
-        print(f"모델 로드 실패: {str(e)}")
-        raise
-
-def run_stock_prediction(df):
-    """전체 주가 예측 프로세스 실행"""
-    try:
-        # 1. 특징 생성
-        print("특징 생성 중...")
-        df_ml = create_ml_features(df)
-        
-        # 2. 데이터 준비
-        print("데이터 준비 중...")
-        (X_train, X_test, y_train, y_test), scalers = prepare_ml_data(df_ml)
-        
-        # 3. 모델 학습
-        print("모델 학습 중...")
-        model = train_stock_model(X_train, y_train)
-        
-        # 4. 예측 수행
-        print("예측 수행 중...")
-        y_pred = model.predict(X_test)
-        
-        # 5. 성능 평가
-        print("성능 평가 중...")
-        metrics = evaluate_predictions(y_test, y_pred, scalers)
-        
-        # 6. 다음 거래일 예측 (df 대신 df_ml 사용)
-        next_day_pred = predict_stock_prices(df_ml, model, scalers)
-        
-        return {
-            'model': model,
-            'scalers': scalers,
-            'metrics': metrics,
-            'next_day_prediction': next_day_pred,
-            'feature_importance': dict(zip(FEATURE_COLUMNS, model.feature_importances_))  # df_ml.columns 대신 FEATURE_COLUMNS 사용
-        }
-        
-    except Exception as e:
-        print(f"예측 중 오류 발생: {str(e)}")
         raise
 
 def read_combined_data_from_hdfs(ticker):
@@ -401,118 +342,6 @@ def save_model_results_to_hdfs(ticker, results):
         print(f"모델 결과 저장 실패: {str(e)}")
         raise
 
-def process_stock_predictions(**context):
-    """주가 예측 프로세스를 실행하는 Airflow 태스크"""
-    try:
-        for ticker in tickers:
-            # 1. MapReduce 결과 데이터 읽기
-            print(f"{ticker} 데이터 읽는 중...")
-            df = read_combined_data_from_hdfs(ticker)
-            
-            # 2. 예측 모델 실행
-            print(f"{ticker} 예측 모델 실행 중...")
-            results = run_stock_prediction(df)
-            
-            # 3. 모델과 스케일러 저장
-            print(f"{ticker} 모델 저장 중...")
-            save_model_to_hdfs(ticker, results['model'], results['scalers'])
-            
-            # 4. 결과 저장
-            print(f"{ticker} 결과 저장 중...")
-            save_model_results_to_hdfs(ticker, results)
-            
-            print(f"{ticker} 처리 완료")
-            
-    except Exception as e:
-        print(f"주가 예측 처리 중 오류 발생: {str(e)}")
-        raise
-    
-def get_latest_stock_data(ticker):
-    """Yahoo Finance에서 최신 주가 데이터 가져오기"""
-    try:
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=90)  # 90일치 데이터
-        
-        stock = yf.Ticker(ticker)
-        df = stock.history(start=start_date, end=end_date)
-        
-        # 인덱스를 Date 컬럼으로 변환
-        df = df.reset_index()
-        df = df.rename(columns={'index': 'Date', 'Stock Splits': 'StockSplits'})
-        
-        return df
-        
-    except Exception as e:
-        print(f"주가 데이터 가져오기 실패: {str(e)}")
-        raise
-
-def save_prediction_results(ticker, predictions, timestamp):
-    """예측 결과를 HDFS에 저장"""
-    try:
-        client = InsecureClient(hadoop_url)
-        prediction_path = f'{hdfs_path}/{ticker}/daily_predictions'
-        
-        # 예측 결과 준비
-        result_dict = {
-            'prediction_date': timestamp.strftime('%Y-%m-%d'),
-            'timestamp': timestamp.isoformat(),
-            'predictions': {
-                'Close': float(predictions['Pred_Close'].iloc[0])
-            }
-        }
-        
-        # JSON으로 변환
-        result_json = json.dumps(result_dict)
-        
-        # 임시 파일 생성
-        temp_path = f'/tmp/{ticker}_prediction_{timestamp.strftime("%Y%m%d")}.json'
-        with open(temp_path, 'w') as f:
-            f.write(result_json)
-        
-        # HDFS에 업로드
-        client.upload(f'{prediction_path}/prediction_{timestamp.strftime("%Y%m%d")}.json', 
-                     temp_path,
-                     overwrite=True)
-        
-        # 임시 파일 삭제
-        os.remove(temp_path)
-        
-        print(f"일일 예측 결과 저장 완료: {result_dict}")
-        
-    except Exception as e:
-        print(f"예측 결과 저장 실패: {str(e)}")
-        raise
-
-def run_model_prediction(**context):
-    """저장된 모델을 사용하여 예측 수행"""
-    try:
-        client = InsecureClient(hadoop_url)
-        timestamp = datetime.now()
-        
-        for ticker in tickers:
-            print(f"{ticker} 예측 시작...")
-            
-            # 1. 저장된 모델 및 스케일러 로드
-            model, scalers = load_model_from_hdfs(client, ticker)
-            
-            # 2. 최신 주가 데이터 가져오기
-            df = get_latest_stock_data(ticker)
-            
-            # 3. 특징 생성
-            df_ml = create_ml_features(df)  # df_ml 생성
-            
-            # 4. 다음 거래일 예측 (df 대신 df_ml 사용)
-            next_day_pred = predict_stock_prices(df_ml, model, scalers)
-            
-            # 5. 예측 결과 저장
-            save_prediction_results(ticker, next_day_pred, timestamp)
-            
-            print(f"{ticker} 예측 완료")
-            
-    except Exception as e:
-        print(f"예측 실행 중 오류 발생: {str(e)}")
-        raise
-
 @dag(
     "update_stock_prediction_model",
     default_args={
@@ -544,42 +373,56 @@ def stock_prediction_dag():
             df = read_combined_data_from_hdfs(ticker)
             
             print(f"{ticker} 예측 모델 실행 중...")
-            results = run_stock_prediction(df)
             
-            print(f"{ticker} 모델 저장 중...")
-            save_model_to_hdfs(ticker, results['model'], results['scalers'])
+            try:
+                # 1. 특징 생성
+                print("특징 생성 중...")
+                df_ml = create_ml_features(df)
+                
+                # 2. 데이터 준비
+                print("데이터 준비 중...")
+                (X_train, X_test, y_train, y_test), scalers = prepare_ml_data(df_ml)
+                
+                # 3. 모델 학습
+                print("모델 학습 중...")
+                model = train_stock_model(X_train, y_train)
+                
+                # 4. 예측 수행
+                print("예측 수행 중...")
+                y_pred = model.predict(X_test)
+                
+                # 5. 성능 평가
+                print("성능 평가 중...")
+                metrics = evaluate_predictions(y_test, y_pred, scalers)
+                
+                # 6. 다음 거래일 예측 (df 대신 df_ml 사용)
+                next_day_pred = predict_stock_prices(df_ml, model, scalers)
+                
+                results =  {
+                    'model': model,
+                    'scalers': scalers,
+                    'metrics': metrics,
+                    'next_day_prediction': next_day_pred,
+                    'feature_importance': dict(zip(FEATURE_COLUMNS, model.feature_importances_))  # df_ml.columns 대신 FEATURE_COLUMNS 사용
+                }
+                
+                print(f"{ticker} 모델 저장 중...")
+                save_model_to_hdfs(ticker, results['model'], results['scalers'])
+                
+                print(f"{ticker} 결과 저장 중...")
+                save_model_results_to_hdfs(ticker, results)
+                
+                print(f"{ticker} 처리 완료")
             
-            print(f"{ticker} 결과 저장 중...")
-            save_model_results_to_hdfs(ticker, results)
-            
-            print(f"{ticker} 처리 완료")
-        
-        return True
+                return True
+                
+            except Exception as e:
+                print(f"예측 중 오류 발생: {str(e)}")
     
-    @task
-    def predict_next_day(training_complete):
-        """다음날 주가 예측"""
-        client = InsecureClient(hadoop_url)
-        timestamp = datetime.now()
-        
-        for ticker in tickers:
-            print(f"{ticker} 예측 시작...")
-            
-            model, scalers = load_model_from_hdfs(client, ticker)
-            df = get_latest_stock_data(ticker)
-            df_ml = create_ml_features(df)
-            
-            next_day_pred = predict_stock_prices(df_ml, model, scalers)
-            save_prediction_results(ticker, next_day_pred, timestamp)
-            
-            print(f"{ticker} 예측 완료")
-            
-        return True
 
     # Task 의존성 설정
     merge_complete = merge_stock_data()
     training_complete = train_and_save_model(merge_complete)
-    predict_next_day(training_complete)
 
 # DAG 생성
 stock_prediction_dag()

@@ -180,7 +180,7 @@ with DAG(
         "retry_delay": timedelta(minutes=5),
     },
     description="주가 데이터를 수집하여 월별로 분할하여 파일 저장",
-    schedule=timedelta(days=1),
+    schedule=None,
     start_date=datetime(2021, 1, 1),
     catchup=False,
     tags=["example"],
