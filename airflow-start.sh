@@ -14,4 +14,5 @@ cp ./airflow/dags/mapreduce/stock_reducer.py ~/airflow/dags/mapreduce/stock_redu
 python3.12 -m venv ./airflow/airflow_env
 source ./airflow/airflow_env/bin/activate
 pip install -r ./airflow/requirements.txt
+export AIRFLOW_HOME=~/airflow
 airflow standalone
