@@ -31,3 +31,9 @@ http://localhost:8080
 
 cd ~/airflow
 rm airflow.db
+
+## example dag 제거
+
+cd ~/airflow
+vi airflow.cfg
+load_examples = False로 변경
