@@ -6,6 +6,10 @@ cd ../kafka-native-k8s
 kubectl apply -f dep.yml
 kubectl apply -f svc.yml
 
+./consume.sh
+curl http://localhost:8000/produce/hello
+{"status":"success","message":"Message sent to Kafka: hello"}%
+
 # 테스트
 
 cd /home/mynspluto/다운로드/kafka_2.13-3.9.0/bin

@@ -8,8 +8,14 @@ import pandas as pd
 from io import BytesIO
 import joblib
 import numpy as np
+import json
+from confluent_kafka import Producer
 
 app = FastAPI(title="Stock Prediction API")
+
+producer = Producer({
+    'bootstrap.servers': 'localhost:9092'
+})
 
 # 설정
 hadoop_url = 'http://localhost:9870'
@@ -138,6 +144,33 @@ async def predict(ticker: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/produce/{message}")
+async def produce_message(message: str):
+    try:
+        # 메시지 준비
+        kafka_message = {
+            "message": message,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Kafka로 메시지 전송
+        producer.produce(
+            'test_1',
+            key=str(datetime.now().timestamp()),
+            value=json.dumps(kafka_message)
+        )
+        producer.flush()
+        
+        return {
+            "status": "success",
+            "message": f"Message sent to Kafka: {message}"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to send message: {str(e)}"
+        }
 
 if __name__ == "__main__":
     uvicorn.run("stock_prediction_api:app", host="0.0.0.0", port=8000, reload=True)
