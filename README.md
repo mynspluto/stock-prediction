@@ -14,6 +14,20 @@ ssh 설정
 설정 ~/hadoop-3.4.1/etc/hadoop/core-site.xml, hdfs-site.xml 등 수정 필요
 hadoop.env.sh 자바 11버전 이전으로
 
+## minikube 설치
+
+도커 설치, 권한 부여
+
+kubectl 설치
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+minikube 설치
+
+## helm 설치
+
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
 ## fast api
 
 기본 8000번 포트
