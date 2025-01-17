@@ -10,7 +10,6 @@ cp ./airflow/dags/download_upload_stock_data.py ~/airflow/dags/download_upload_s
 cp ./airflow/dags/update_stock_prediction_model.py ~/airflow/dags/update_stock_prediction_model.py
 cp ./airflow/dags/mapreduce/stock_mapper.py ~/airflow/dags/mapreduce/stock_mapper.py
 cp ./airflow/dags/mapreduce/stock_reducer.py ~/airflow/dags/mapreduce/stock_reducer.py
-cp ./airflow/dags/consume.py ~/airflow/dags/mapreduce/consume.py
 
 python3.12 -m venv ./airflow/airflow_env
 source ./airflow/airflow_env/bin/activate

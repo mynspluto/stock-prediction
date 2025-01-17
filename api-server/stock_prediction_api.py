@@ -111,6 +111,7 @@ class PredictionResponse(BaseModel):
     predicted_close: float
     current_close: float
     prediction_timestamp: str
+    is_intraday: bool
 
 @app.get("/")
 def read_root():
@@ -131,13 +132,65 @@ async def predict(ticker: str):
         # 4. 예측 수행
         next_day_pred = predict_stock_prices(df_ml, model, scalers)
         
-        # 5. 응답 생성
+        predicted_close = float(next_day_pred['Pred_Close'].iloc[0])
+        current_close = float(df['Close'].iloc[-1])
+        
+        # 5. 장중 데이터인지 확인
+        last_data_date = pd.to_datetime(df['Date'].iloc[-1]).date()
+        prediction_date = next_day_pred.index[0].date()
+        
+        is_intraday = (last_data_date == prediction_date)
+        
+        # alert_message = {
+        #     "ticker": ticker,
+        #     "current_price": current_close,
+        #     "predicted_price": predicted_close,
+        #     "price_diff_percent": 1,
+        #     "prediction_date": prediction_date.strftime('%Y-%m-%d'),
+        #     "last_update": df['Date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
+        #     "alert_timestamp": datetime.now().isoformat(),
+        #     "alert_type": "intraday_price_difference",
+        #     "direction": "up" if predicted_close > current_close else "down"
+        # }
+        
+        # producer.produce(
+        #     'test_1',
+        #     key=ticker,
+        #     value=json.dumps(alert_message)
+        # )
+        # producer.flush()
+        
+        # 장중인 경우에만 알림 발생
+        if is_intraday:
+            price_diff_percent = abs(predicted_close - current_close) / current_close * 100
+            
+            if price_diff_percent >= 1.0:
+                alert_message = {
+                    "ticker": ticker,
+                    "current_price": current_close,
+                    "predicted_price": predicted_close,
+                    "price_diff_percent": price_diff_percent,
+                    "prediction_date": prediction_date.strftime('%Y-%m-%d'),
+                    "last_update": df['Date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
+                    "alert_timestamp": datetime.now().isoformat(),
+                    "alert_type": "intraday_price_difference",
+                    "direction": "up" if predicted_close > current_close else "down"
+                }
+                
+                producer.produce(
+                    'test_1',
+                    key=ticker,
+                    value=json.dumps(alert_message)
+                )
+                producer.flush()
+        
         response = PredictionResponse(
             ticker=ticker,
-            prediction_date=next_day_pred.index[0].strftime('%Y-%m-%d'),
-            predicted_close=float(next_day_pred['Pred_Close'].iloc[0]),
-            current_close=float(df['Close'].iloc[-1]),
-            prediction_timestamp=datetime.now().isoformat()
+            prediction_date=prediction_date.strftime('%Y-%m-%d'),
+            predicted_close=predicted_close,
+            current_close=current_close,
+            prediction_timestamp=datetime.now().isoformat(),
+            is_intraday=is_intraday
         )
         
         return response
