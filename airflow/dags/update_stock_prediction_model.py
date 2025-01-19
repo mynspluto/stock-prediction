@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime, timedelta
 from io import BytesIO
 import joblib
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,8 +22,31 @@ from airflow.decorators import dag, task
 
 import yfinance as yf
 
-stock_data_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
-hadoop_url = 'http://localhost:9870'
+
+# 환경 설정
+ENVIRONMENT = os.getenv('AIRFLOW_ENV', 'local')  # 기본값은 local
+
+# 환경별 설정
+ENV_CONFIG = {
+    'local': {
+        'STOCK_DATA_PATH': str(Path.home() / 'Project/stock-prediction/airflow/data/stock-history'),
+        'HADOOP_URL': 'http://localhost:9870'
+    },
+    'kubernetes': {
+        'STOCK_DATA_PATH': '/opt/airflow/stock_data',
+        'HADOOP_URL': 'http://host.minikube.internal:9870'
+    }
+}
+
+# 현재 환경의 설정 가져오기
+current_config = ENV_CONFIG.get(ENVIRONMENT, ENV_CONFIG['local'])
+
+# 환경변수 설정
+# stock_data_path = '/home/mynspluto/Project/stock-prediction/airflow/data/stock-history'
+# hadoop_url = 'http://localhost:9870'
+stock_data_path = os.getenv('STOCK_DATA_PATH', current_config['STOCK_DATA_PATH'])
+hadoop_url = os.getenv('HADOOP_URL', current_config['HADOOP_URL'])
+
 hdfs_path = "/stock-history"
 hadoop_home = "/home/mynspluto/hadoop-3.4.1"
 tickers = ['^IXIC']
