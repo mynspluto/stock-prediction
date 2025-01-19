@@ -24,6 +24,18 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 minikube 설치
 
+## airflow minikube 이슈
+
+minikube ssh 안에서 mynspluto-pc 접근 가능
+설정 =>
+mkdir -p ~/.minikube/files/etc
+#ip addr show | grep inet | grep -v inet6 | grep -v 127.0.0.1 # inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute wlx705dccf17662 # inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0 # inet 192.168.49.1/24 brd 192.168.49.255 scope global br-759caf2dff41
+echo 192.168.49.1 mynspluto-pc > ~/.minikube/files/etc/hosts
+
+airflow-webser 컨테이너에서 mynspluto-pc 접근 불가능
+client.upload 시 http://host.minikube.internal:9870는 접근이 되나
+redirect 되는 http://mynspluto-pc:9870에 접근 불가능
+
 ## helm 설치
 
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash

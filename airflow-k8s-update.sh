@@ -9,7 +9,7 @@ docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
 helm repo add airflow-stable https://airflow-helm.github.io/charts
 helm repo add apache-airflow https://airflow.apache.org
 helm repo update
-helm install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
+helm upgrade airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 
 PORT=8080
 
@@ -25,4 +25,4 @@ fi
 
 sleep 10
 
-nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
+#nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
