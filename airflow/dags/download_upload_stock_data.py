@@ -21,10 +21,6 @@ ENV_CONFIG = {
     },
     'kubernetes': {
         'STOCK_DATA_PATH': '/opt/airflow/stock_data',
-        #ip addr show | grep inet | grep -v inet6 | grep -v 127.0.0.1
-        # inet 192.168.0.11/24 brd 192.168.0.255 scope global dynamic noprefixroute wlx705dccf17662
-        # inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
-        # inet 192.168.49.1/24 brd 192.168.49.255 scope global br-759caf2dff41
         'HADOOP_URL': 'http://host.minikube.internal:9870'
     }
 }
@@ -177,25 +173,23 @@ def upload_json_to_hdfs(stock_data_path, tickers):
     import functools
 
     def custom_getaddrinfo(host, port, *args, **kwargs):
-        if host == 'mynspluto-pc':
+        if host == 'mynspluto-pc' and ENVIRONMENT == 'kubernetes':
             return socket.getaddrinfo('host.minikube.internal', port, *args, **kwargs)
         return socket._getaddrinfo(host, port, *args, **kwargs)
 
     # 호스트 리졸브 함수 오버라이드
     socket._getaddrinfo = socket.getaddrinfo
     socket.getaddrinfo = custom_getaddrinfo
-    time.sleep(5)
     
     for ticker in tickers:
         hdfs_ticker_data_path = f"{hdfs_base_path}/{ticker}/monthly"
         try:
             if not client.status(hdfs_ticker_data_path, strict=False):
-                time.sleep(5)
                 client.makedirs(hdfs_ticker_data_path)
                 print(f"Created HDFS directory: {hdfs_ticker_data_path}")
         except Exception as e:
             print(f"Creating directory {hdfs_ticker_data_path}: {str(e)}")
-            time.sleep(5)
+            
             client.makedirs(hdfs_ticker_data_path)
 
         # Upload files
@@ -208,18 +202,15 @@ def upload_json_to_hdfs(stock_data_path, tickers):
                     try:
                         # Check if file exists
                         if client.status(hdfs_path, strict=False):
-                            time.sleep(5)
                             print(f"File {hdfs_path} already exists, overwriting...")
                             client.delete(hdfs_path)
                         
                         # Upload the file
                         client.upload(hdfs_path, local_file_path, overwrite=True)
-                        time.sleep(5)
                         print(f"Uploaded {local_file_path} to HDFS path {hdfs_path}")
                     except Exception as e:
                         print(f"Error uploading {local_file_path}: {str(e)}")
-                        time.sleep(5)
-
+                        
 with DAG(
     "download_upload_stock_data",
     default_args={
