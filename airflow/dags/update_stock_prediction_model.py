@@ -30,11 +30,13 @@ ENVIRONMENT = os.getenv('AIRFLOW_ENV', 'local')  # 기본값은 local
 ENV_CONFIG = {
     'local': {
         'STOCK_DATA_PATH': str(Path.home() / 'project/stock-prediction/airflow/data/stock-history'),
-        'HADOOP_URL': 'http://localhost:9870'
+        'HADOOP_URL': 'http://localhost:9870',
+        'HADOOP_HOME': '/home/mynspluto/hadoop-3.4.1'
     },
     'kubernetes': {
         'STOCK_DATA_PATH': '/opt/airflow/stock_data',
-        'HADOOP_URL': 'http://host.minikube.internal:9870'
+        'HADOOP_URL': 'http://host.minikube.internal:9870',
+        'HADOOP_HOME': '/opt/hadoop'
     }
 }
 
@@ -46,9 +48,8 @@ current_config = ENV_CONFIG.get(ENVIRONMENT, ENV_CONFIG['local'])
 # hadoop_url = 'http://localhost:9870'
 stock_data_path = os.getenv('STOCK_DATA_PATH', current_config['STOCK_DATA_PATH'])
 hadoop_url = os.getenv('HADOOP_URL', current_config['HADOOP_URL'])
-
+hadoop_home = os.getenv('HADOOP_HOME', current_config['HADOOP_URL'])
 hdfs_path = "/stock-history"
-hadoop_home = "/home/mynspluto/hadoop-3.4.1"
 tickers = ['^IXIC']
 
 FEATURE_COLUMNS = [

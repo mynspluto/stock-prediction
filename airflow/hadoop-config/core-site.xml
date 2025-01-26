@@ -19,7 +19,7 @@
 <configuration>
     <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://host.minikube.internal:9870</value>
+        <value>hdfs://host.minikube.internal:9000</value>
     </property>
 
     <property>
@@ -27,3 +27,17 @@
         <value>2097152000</value> <!-- 예시로 크기를 2GB로 늘림 -->
     </property>
 </configuration>
+
+<!-- 서버
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://0.0.0.0:9000</value>
+    </property>
+
+    <property>
+        <name>ipc.maximum.data.length</name>
+        <value>2097152000</value> <!-- 예시로 크기를 2GB로 늘림 -->
+    </property>
+</configuration>
+-->

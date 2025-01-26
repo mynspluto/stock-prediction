@@ -37,6 +37,55 @@ Streaming Command Failed!
 => 실제로 파일이 없었음 파일 download dag 실행해서 채우고 다른 에러 발생 Permission denied: user=airflow, access=WRITE, inode="/stock-history/^IXIC":hadoop:supergroup:drwxr-xr-x
 권한에러 해당 디렉토리에 777권한 주면 해결될것으로 예상
 
+다음날 실행해보니
+DatanodeInfoWithStorage[127.0.0.1:9866,DS-f80d540f-f347-4447-968b-8f9df3457a10,DISK] 에러 발생
+저장된 데이터노드의 주소를 127.0.0.1로 받는듯한데 네임노드에서 주는 것으로 예상
+데이터를 저장할때 네임노드가 주소를 127.0.0.1로 붙인거 같음
+서버측 hdfs-site.xml
+<configuration>
+<property>
+<name>dfs.replication</name>
+<value>1</value>
+</property>
+<property>
+<name>dfs.datanode.address</name>
+<value>0.0.0.0:9866</value>
+</property>
+<property>
+<name>dfs.datanode.hostname</name>
+<value>host.minikube.internal</value>
+</property>
+<property>
+<name>dfs.datanode.use.datanode.hostname</name>
+<value>true</value>
+</property>
+</configuration>
+
+클라이언트 hdfs-site.xml
+<configuration>
+<property>
+<name>dfs.replication</name>
+<value>1</value>
+</property>
+<property>
+<name>dfs.datanode.address</name>
+<value>0.0.0.0:9866</value>
+</property>
+<property>
+<name>dfs.datanode.hostname</name>
+<value>host.minikube.internal</value>
+</property>
+<property>
+<name>dfs.datanode.use.datanode.hostname</name>
+<value>true</value>
+</property>
+</configuration>
+
+host의 /etc/hosts
+127.0.0.1 host.minikube.internal
+저장할때 hostname을 이용하여 host.minikube.internal로 저장하게 함
+네임노드에서 클라이언트에 주소 알려줄때에도 host.minikube.internal로 받게함
+
 ## airflow 설치
 
 sudo apt update

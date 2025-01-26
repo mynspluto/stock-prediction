@@ -17,12 +17,19 @@
 <!-- Put site-specific property overrides in this file. -->
 <configuration>
     <property>
-        <name>dfs.replication</name>
-        <value>1</value>
+      <name>dfs.replication</name>
+      <value>1</value>
     </property>
-
-    <!-- <property>
-        <name>dfs.namenode.rpc-address</name>
-        <value>host.minikube.internal:8020</value>
-    </property> -->
+    <property>
+      <name>dfs.datanode.address</name>
+      <value>0.0.0.0:9866</value>
+    </property>
+    <property>
+      <name>dfs.datanode.hostname</name>
+      <value>host.minikube.internal</value>
+    </property>
+    <property>
+      <name>dfs.datanode.use.datanode.hostname</name>
+      <value>true</value>
+    </property>
 </configuration>

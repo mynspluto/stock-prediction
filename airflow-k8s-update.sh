@@ -1,5 +1,9 @@
 # 이미지 변경해서 업데이트 잘 안되는 경우 minikube ssh => docker images로 호스트에서 업데이트한 이미지 적용됐는지 확인
 # 안된 경우 호스트에서 eval $(minikube -p minikube docker-env)
+
+eval $(minikube -p minikube docker-env)
+#unset DOCKER_HOST
+
 docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
 helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 

@@ -4,6 +4,7 @@ kubectl create namespace airflow
 kubectl config set-context --current --namespace=airflow
 
 eval $(minikube -p minikube docker-env)
+# unset DOCKER_HOST
 docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
 
 helm repo add airflow-stable https://airflow-helm.github.io/charts

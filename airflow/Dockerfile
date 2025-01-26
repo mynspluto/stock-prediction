@@ -3,11 +3,11 @@ FROM apache/airflow:2.9.2
 USER root
 
 RUN apt-get update && \
-    apt-get install -y \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
     vim \
     python3-pip \
     net-tools \
-    ping \
+    iputils-ping \
     curl \
     wget \
     libkrb5-dev \
@@ -37,7 +37,7 @@ ENV HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
 ENV PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
 COPY ./hadoop-config/core-site.xml $HADOOP_CONF_DIR/core-site.xml
 COPY ./hadoop-config/hdfs-site.xml $HADOOP_CONF_DIR/hdfs-site.xml
-
+ENV HADOOP_USER_NAME=hadoop
 
 COPY requirements.txt /requirements.txt
 
