@@ -24,7 +24,7 @@
 
     <property>
         <name>ipc.maximum.data.length</name>
-        <value>2097152000</value> <!-- 예시로 크기를 2GB로 늘림 -->
+        <value>2097152000</value>
     </property>
 </configuration>
 
@@ -37,7 +37,7 @@
 
     <property>
         <name>ipc.maximum.data.length</name>
-        <value>2097152000</value> <!-- 예시로 크기를 2GB로 늘림 -->
+        <value>2097152000</value>
     </property>
 </configuration>
 -->

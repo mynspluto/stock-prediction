@@ -96,22 +96,38 @@ def run_hadoop_mapreduce(tickers):
             '-output', output_path
         ]
         
-        # MapReduce 작업 실행
-        process = subprocess.Popen(
-            hadoop_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+        command = f'hadoop jar {streaming_jar} -files {mapper_path},{reducer_path} -mapper "python3 stock_mapper.py" -reducer "python3 stock_reducer.py" -input {input_path} -output {output_path}'
+        status = os.system(command)
+        print(status)
         
-        # 실행 결과 출력
-        stdout, stderr = process.communicate()
+        # process = subprocess.Popen(
+        #     hadoop_command,
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        #     bufsize=1,  # 라인 버퍼링
+        #     universal_newlines=True  # 텍스트 모드
+        # )
         
-        if process.returncode == 0:
-            print("MapReduce job completed successfully")
-            print(stdout.decode())
-        else:
-            print("MapReduce job failed")
-            print(stderr.decode())
+        # 실시간으로 출력 로깅
+        # while True:
+        #     stdout_line = process.stdout.readline()
+        #     stderr_line = process.stderr.readline()
+            
+        #     if stdout_line:
+        #         print(stdout_line.strip())
+        #     if stderr_line:
+        #         print(stderr_line.strip())
+                
+        #     if not stdout_line and not stderr_line and process.poll() is not None:
+        #         break
+                
+        # return_code = process.poll()
+        
+        # if return_code == 0:
+        #     print("MapReduce job completed successfully")
+        # else:
+        #     print("MapReduce job failed")
+        #     raise Exception("MapReduce job failed with return code: " + str(return_code))
             
       except Exception as e:
           print(f"Error running MapReduce job: {str(e)}")

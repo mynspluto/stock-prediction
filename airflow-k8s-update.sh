@@ -4,8 +4,8 @@
 eval $(minikube -p minikube docker-env)
 #unset DOCKER_HOST
 
-docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
-helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
+# docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
+# helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 
 PORT=8080
 
