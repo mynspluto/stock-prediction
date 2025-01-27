@@ -2,26 +2,19 @@
 # 안된 경우 호스트에서 eval $(minikube -p minikube docker-env)
 
 eval $(minikube -p minikube docker-env)
-#unset DOCKER_HOST
 
-# docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
-# helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
+docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
+helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 
-PORT=8080
-
-# Check if the port is in use and get the PID
-PID=$(lsof -t -i :$PORT)
-
-# If the port is in use, kill the process
-if [ -n "$PID" ]; then
-    echo "Port $PORT is already in use by PID $PID. Terminating the process..."
-    kill $PID
-    sleep 2  # Wait for the process to terminate
-fi
-
-sleep 10
-
-nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
+# PORT=8080
+# PID=$(lsof -t -i :$PORT)
+# if [ -n "$PID" ]; then
+#     echo "Port $PORT is already in use by PID $PID. Terminating the process..."
+#     kill $PID
+#     sleep 2
+# fi
+# sleep 10
+#nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
 
 # 이미지 변경 없이 현재 버전으로 재시작
 # kubectl rollout restart statefulset airflow-worker -n airflow

@@ -88,6 +88,24 @@ host의 /etc/hosts
 
 merge_stock_data dag는 실패한듯함
 
+## airflow ingress로 노출
+
+헬름으로 만들어진 서비스에 포트 달고
+
+1. kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "NodePort", "ports": [{"port": 8080, "targetPort": 8080, "nodePort": 31000}]}}'
+2. kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "ClusterIP", "ports": [{"port": 8080, "targetPort": 8080}]}}'
+   1은 ingress 거치지 않고 노출 가능
+   굳이 노출할 필요 없으니 2로 설정 권장
+
+/etc/hosts
+192.168.49.2(minikube ip) airflow.example.com
+
+minikube addons list | grep ingress
+minikube addons enable ingress
+kubectl apply -f ./airflow/ingress.yml
+몇 초 기다리면 airflow-webservice와 airflow-ingress가 연결되어 airflow-ingress에 adress(minikube ip)가 생김
+airflow.example.com로 접속 가능
+
 ## airflow 설치
 
 sudo apt update

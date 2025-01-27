@@ -9,7 +9,9 @@ docker build -t mynspluto-airflow:latest -f ./airflow/Dockerfile ./airflow
 
 helm repo add airflow-stable https://airflow-helm.github.io/charts
 helm repo add apache-airflow https://airflow.apache.org
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
+helm install nginx-ingress ingress-nginx/ingress-nginx
 helm install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 
 PORT=8080
