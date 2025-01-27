@@ -21,15 +21,28 @@
       <value>1</value>
     </property>
     <property>
-      <name>dfs.datanode.address</name>
-      <value>0.0.0.0:9866</value>
-    </property>
-    <property>
-      <name>dfs.datanode.hostname</name>
-      <value>host.minikube.internal</value>
-    </property>
-    <property>
-      <name>dfs.datanode.use.datanode.hostname</name>
+      <name>dfs.client.use.datanode.hostname</name>
       <value>true</value>
     </property>
 </configuration>
+
+<!-- 서버측
+<configuration>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+  <property>
+    <name>dfs.datanode.address</name>
+    <value>0.0.0.0:9866</value>
+  </property>
+  <property>
+    <name>dfs.datanode.hostname</name>
+    <value>host.minikube.internal</value>
+  </property>
+  <property>
+    <name>dfs.datanode.use.datanode.hostname</name>
+    <value>true</value>
+  </property>
+</configuration>
+-->

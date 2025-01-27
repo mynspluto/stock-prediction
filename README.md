@@ -86,6 +86,8 @@ host의 /etc/hosts
 저장할때 hostname을 이용하여 host.minikube.internal로 저장하게 함
 네임노드에서 클라이언트에 주소 알려줄때에도 host.minikube.internal로 받게함
 
+merge_stock_data dag는 실패한듯함
+
 ## airflow 설치
 
 sudo apt update
