@@ -167,19 +167,6 @@ def upload_json_to_hdfs(stock_data_path, tickers):
         hadoop_url,
         user='hadoop'
     )
-
-    # 호스트 매핑 설정
-    import socket
-    import functools
-
-    def custom_getaddrinfo(host, port, *args, **kwargs):
-        if host == 'mynspluto-pc' and ENVIRONMENT == 'kubernetes':
-            return socket.getaddrinfo('host.minikube.internal', port, *args, **kwargs)
-        return socket._getaddrinfo(host, port, *args, **kwargs)
-
-    # 호스트 리졸브 함수 오버라이드
-    socket._getaddrinfo = socket.getaddrinfo
-    socket.getaddrinfo = custom_getaddrinfo
     
     for ticker in tickers:
         hdfs_ticker_data_path = f"{hdfs_base_path}/{ticker}/monthly"

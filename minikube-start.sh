@@ -13,3 +13,4 @@ minikube docker-env
 eval $(minikube -p minikube docker-env)
 unset DOCKER_HOST
 
+minikube addons list | grep ingress
