@@ -279,61 +279,59 @@ def save_model_to_hdfs(ticker, model, scalers):
     try:
         import socket
 
-        # Simplified host mapping without nested function
-        def resolve_host(host):
-            if host == 'mynspluto-pc' and ENVIRONMENT == 'kubernetes':
-                return 'host.minikube.internal'
-            return host
+        _original_getaddrinfo = socket.getaddrinfo
+        
+        def custom_getaddrinfo(host, port, *args, **kwargs):
+            if ENVIRONMENT == 'kubernetes':
+                return _original_getaddrinfo('host.minikube.internal', port, *args, **kwargs)
+            return _original_getaddrinfo(host, port, *args, **kwargs)
+        
+        socket.getaddrinfo = custom_getaddrinfo
 
-        # Store original getaddrinfo
-        original_getaddrinfo = socket.getaddrinfo
-
-        try:
-            # Temporarily modify getaddrinfo
-            socket.getaddrinfo = lambda host, port, *args, **kwargs: \
-                original_getaddrinfo(resolve_host(host), port, *args, **kwargs)
-
-            client = InsecureClient(hadoop_url, user='hadoop')
-            model_path = f'{hdfs_path}/{ticker}/model'
-            
-            # 모델과 스케일러를 임시 파일로 저장
-            temp_model_path = f'/tmp/{ticker}_model.joblib'
-            temp_scalers_path = f'/tmp/{ticker}_scalers.joblib'
-            
-            joblib.dump(model, temp_model_path)
-            joblib.dump(scalers, temp_scalers_path)
-            
-            # HDFS에 업로드
-            client.upload(f'{model_path}/model.joblib', temp_model_path, overwrite=True)
-            client.upload(f'{model_path}/scalers.joblib', temp_scalers_path, overwrite=True)
-            
-            # 임시 파일 삭제
-            os.remove(temp_model_path)
-            os.remove(temp_scalers_path)
-            
-            print(f"모델 저장 완료: {model_path}")
-            
-        finally:
-            # Restore original getaddrinfo
-            socket.getaddrinfo = original_getaddrinfo
+        client = InsecureClient(hadoop_url, user='hadoop')
+        model_path = f'{hdfs_path}/{ticker}/model'
+        
+        # 모델과 스케일러를 임시 파일로 저장
+        temp_model_path = f'/tmp/{ticker}_model.joblib'
+        temp_scalers_path = f'/tmp/{ticker}_scalers.joblib'
+        
+        joblib.dump(model, temp_model_path)
+        joblib.dump(scalers, temp_scalers_path)
+        
+        # HDFS에 업로드
+        client.upload(f'{model_path}/model.joblib', temp_model_path, overwrite=True)
+        client.upload(f'{model_path}/scalers.joblib', temp_scalers_path, overwrite=True)
+        
+        # 임시 파일 삭제
+        os.remove(temp_model_path)
+        os.remove(temp_scalers_path)
+        
+        print(f"모델 저장 완료: {model_path}")
         
     except Exception as e:
         print(f"모델 저장 실패: {str(e)}")
         raise
+            
+    finally:
+        socket.getaddrinfo = _original_getaddrinfo
+        
+    
 
 def read_combined_data_from_hdfs(ticker):
     """
     MapReduce 결과로 생성된 통합 데이터를 HDFS에서 읽어오기
     """
     try:
-        # 호스트 매핑 설정
         import socket
-        import functools
 
+        _original_getaddrinfo = socket.getaddrinfo
+        
         def custom_getaddrinfo(host, port, *args, **kwargs):
             if host == 'mynspluto-pc' and ENVIRONMENT == 'kubernetes':
-                return socket.getaddrinfo('host.minikube.internal', port, *args, **kwargs)
-            return socket._getaddrinfo(host, port, *args, **kwargs)
+                return _original_getaddrinfo('host.minikube.internal', port, *args, **kwargs)
+            return _original_getaddrinfo(host, port, *args, **kwargs)
+        
+        socket.getaddrinfo = custom_getaddrinfo
 
         # 호스트 리졸브 함수 오버라이드
         socket._getaddrinfo = socket.getaddrinfo
@@ -369,20 +367,22 @@ def read_combined_data_from_hdfs(ticker):
         print(f"HDFS에서 데이터 읽기 실패: {str(e)}")
         raise
     
+    finally:
+        socket.getaddrinfo = _original_getaddrinfo
+    
 def save_model_results_to_hdfs(ticker, results):
     """모델 결과를 HDFS에 저장"""
     try:
         # 호스트 매핑 설정
         import socket
-        import functools
 
+        _original_getaddrinfo = socket.getaddrinfo
+        
         def custom_getaddrinfo(host, port, *args, **kwargs):
-            if host == 'mynspluto-pc' and ENVIRONMENT == 'kubernetes':
-                return socket.getaddrinfo('host.minikube.internal', port, *args, **kwargs)
-            return socket._getaddrinfo(host, port, *args, **kwargs)
-
-        # 호스트 리졸브 함수 오버라이드
-        socket._getaddrinfo = socket.getaddrinfo
+            if ENVIRONMENT == 'kubernetes':
+                return _original_getaddrinfo('host.minikube.internal', port, *args, **kwargs)
+            return _original_getaddrinfo(host, port, *args, **kwargs)
+        
         socket.getaddrinfo = custom_getaddrinfo
 
         client = InsecureClient(hadoop_url, user='hadoop')
@@ -424,6 +424,10 @@ def save_model_results_to_hdfs(ticker, results):
     except Exception as e:
         print(f"모델 결과 저장 실패: {str(e)}")
         raise
+    
+    finally:
+            # Restore original getaddrinfo
+            socket.getaddrinfo = _original_getaddrinfo
 
 @dag(
     "update_stock_prediction_model",
