@@ -293,7 +293,7 @@ def save_model_to_hdfs(ticker, model, scalers):
             socket.getaddrinfo = lambda host, port, *args, **kwargs: \
                 original_getaddrinfo(resolve_host(host), port, *args, **kwargs)
 
-            client = InsecureClient(hadoop_url)
+            client = InsecureClient(hadoop_url, user='hadoop')
             model_path = f'{hdfs_path}/{ticker}/model'
             
             # 모델과 스케일러를 임시 파일로 저장
@@ -339,7 +339,7 @@ def read_combined_data_from_hdfs(ticker):
         socket._getaddrinfo = socket.getaddrinfo
         socket.getaddrinfo = custom_getaddrinfo
 
-        client = InsecureClient(hadoop_url)
+        client = InsecureClient(hadoop_url, user='hadoop')
         mapreduce_output_path = f'{hdfs_path}/{ticker}/combined_mapreduce/part-00000'
         
         with client.read(mapreduce_output_path, encoding='utf-8') as reader:
@@ -385,7 +385,7 @@ def save_model_results_to_hdfs(ticker, results):
         socket._getaddrinfo = socket.getaddrinfo
         socket.getaddrinfo = custom_getaddrinfo
 
-        client = InsecureClient(hadoop_url)
+        client = InsecureClient(hadoop_url, user='hadoop')
         model_path = f'{hdfs_path}/{ticker}/model_results'
         
         # next_day_prediction DataFrame을 JSON 직렬화

@@ -12,20 +12,29 @@ helm repo add apache-airflow https://airflow.apache.org
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm install nginx-ingress ingress-nginx/ingress-nginx
-helm install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
+helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/values.yml
 
-PORT=8080
+sleep 5
 
-# Check if the port is in use and get the PID
-PID=$(lsof -t -i :$PORT)
+kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "ClusterIP", "ports": [{"port": 8080, "targetPort": 8080}]}}'
 
-# If the port is in use, kill the process
-if [ -n "$PID" ]; then
-    echo "Port $PORT is already in use by PID $PID. Terminating the process..."
-    kill $PID
-    sleep 2  # Wait for the process to terminate
-fi
+minikube addons enable ingress
+minikube addons enable ingress-dns
 
-sleep 10
+kubectl apply -f ./airflow/ingress.yml
 
-nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
+# PORT=8080
+
+# # Check if the port is in use and get the PID
+# PID=$(lsof -t -i :$PORT)
+
+# # If the port is in use, kill the process
+# if [ -n "$PID" ]; then
+#     echo "Port $PORT is already in use by PID $PID. Terminating the process..."
+#     kill $PID
+#     sleep 2  # Wait for the process to terminate
+# fi
+
+# sleep 10
+
+# nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
