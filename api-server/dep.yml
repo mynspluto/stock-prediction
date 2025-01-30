@@ -1,0 +1,30 @@
+# k8s/pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stock-prediction-api
+  labels:
+    app: stock-prediction-api
+spec:
+  containers:
+    - name: stock-prediction-api
+      image: api-server:latest
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 8000
+
+---
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: stock-prediction-api
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 8000
+      nodePort: 30000
+      protocol: TCP
+  selector:
+    app: stock-prediction-api

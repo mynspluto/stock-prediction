@@ -1,24 +1,42 @@
-from fastapi import FastAPI, HTTPException
+import os
+import joblib
+import json
 import uvicorn
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import yfinance as yf
 from datetime import datetime, timedelta
 from hdfs import InsecureClient
-import pandas as pd
 from io import BytesIO
-import joblib
-import numpy as np
-import json
 from confluent_kafka import Producer
+import pandas as pd
 
 app = FastAPI(title="Stock Prediction API")
 
+# 환경 설정
+ENVIRONMENT = os.getenv('EXEC_ENV', 'local')  # 기본값은 local
+
+# 환경별 설정
+ENV_CONFIG = {
+    'local': {
+        'HADOOP_URL': 'http://localhost:9870',
+        'KAFKA_URL':'localhost:9092'
+    },
+    'kubernetes': {
+        'HADOOP_URL': 'http://host.minikube.internal:9870',
+        'KAFKA_URL':'host.minikube.internal:9092'
+    }
+}
+
+current_config = ENV_CONFIG.get(ENVIRONMENT, ENV_CONFIG['local'])
+
+# kubernates 환경인 경우 minikube.host로
 producer = Producer({
-    'bootstrap.servers': 'localhost:9092'
+    'bootstrap.servers': os.getenv('KAFKA_URL', current_config['KAFKA_URL'])
 })
 
 # 설정
-hadoop_url = 'http://localhost:9870'
+hadoop_url = os.getenv('HADOOP_URL', current_config['HADOOP_URL'])
 hdfs_path = "/stock-history"
 
 # HDFS 클라이언트 초기화

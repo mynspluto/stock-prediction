@@ -1,16 +1,7 @@
 #!/bin/zsh
 
-# python3.12 -m venv ./airflow/airflow_env
-# source ./airflow/airflow_env/bin/activate
-# pip install --upgrade pip
-# #pip install -r ./airflow-local/requirements.txt
-# pip install numpy pandas scikit-learn yfinance requests hdfs apache-airflow pydantic fastapi uvicorn confluent-kafka
-# python3.12 ./api-server/stock_prediction_api.py
-
-
-# Create and activate virtual environment
-python3.12 -m venv ./airflow/airflow_env
-source ./airflow/airflow_env/bin/activate
+python3.12 -m venv ./api-server/api_server_env
+source ./api-server/api_server_env/bin/activate
 pip install --upgrade pip
 pip install numpy pandas scikit-learn yfinance requests hdfs apache-airflow pydantic fastapi uvicorn confluent-kafka
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env zsh
-minikube start
 kubectl create namespace kafka
 kubectl config set-context --current --namespace=kafka
 

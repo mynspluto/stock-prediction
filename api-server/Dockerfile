@@ -1,0 +1,26 @@
+# Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+ENV EXEC_ENV=kubernetes
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Command to run the application
+CMD ["python", "stock_prediction_api.py"]
