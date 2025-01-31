@@ -1,6 +1,4 @@
 "use client";
-
-import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
 const DynamicChart = dynamic(() => import("../components/StockChart"), {
@@ -10,7 +8,7 @@ const DynamicChart = dynamic(() => import("../components/StockChart"), {
 
 export default function Home() {
   return (
-    <div>
+    <div className="min-h-screen bg-gray-100 py-8">
       <DynamicChart />
     </div>
   );
