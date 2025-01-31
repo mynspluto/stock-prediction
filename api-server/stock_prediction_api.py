@@ -9,9 +9,18 @@ from datetime import datetime, timedelta
 from hdfs import InsecureClient
 from io import BytesIO
 from confluent_kafka import Producer
+from typing import List, Dict, Any
 import pandas as pd
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Stock Prediction API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 실제 운영환경에서는 특정 도메인만 허용하는 것이 좋습니다
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 환경 설정
 ENVIRONMENT = os.getenv('EXEC_ENV', 'local')  # 기본값은 local
@@ -130,6 +139,7 @@ class PredictionResponse(BaseModel):
     current_close: float
     prediction_timestamp: str
     is_intraday: bool
+    historical_data: List[Dict[str, Any]]
 
 @app.get("/")
 def read_root():
@@ -208,7 +218,8 @@ async def predict(ticker: str):
             predicted_close=predicted_close,
             current_close=current_close,
             prediction_timestamp=datetime.now().isoformat(),
-            is_intraday=is_intraday
+            is_intraday=is_intraday,
+            historical_data = df.to_dict('records')
         )
         
         return response
