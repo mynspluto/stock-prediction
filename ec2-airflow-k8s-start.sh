@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 kubectl create namespace airflow
 kubectl config set-context --current --namespace=airflow

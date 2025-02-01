@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 kubectl delete -f ./kafka/svc.yml
 kubectl delete -f ./kafka/dep.yml
