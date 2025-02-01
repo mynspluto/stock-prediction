@@ -2,7 +2,7 @@
 #docker exec -it namenode hadoop fs -chmod -R 777 /
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-cd /home/mynspluto/hadoop-3.4.1
+cd /home/ec2-user/hadoop-3.4.1
 #bin/hdfs dfsadmin -safemode leave
 bin/hadoop fs -chmod -R 777 /
 
