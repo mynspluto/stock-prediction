@@ -30,4 +30,4 @@ fi
 
 sleep 10
 
-nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
+nohup kubectl port-forward --address 0.0.0.0 -n airflow svc/airflow-webserver 8080:8080 > airflow-port-forward.log 2>&1 &
