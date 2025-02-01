@@ -1,4 +1,4 @@
-minikube start --driver=docker
+minikube start --cpus 3 --memory 12000 --driver=docker
 minikube addons enable metrics-server
 minikube addons enable ingress
 minikube addons enable ingress-dns
