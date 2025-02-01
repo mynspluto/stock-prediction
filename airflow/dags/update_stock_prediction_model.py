@@ -37,6 +37,11 @@ ENV_CONFIG = {
         'STOCK_DATA_PATH': '/opt/airflow/stock_data',
         'HADOOP_URL': 'http://host.minikube.internal:9870',
         'HADOOP_HOME': '/opt/hadoop'
+    },
+    'ec2-kubernetes': {
+        'STOCK_DATA_PATH': '/opt/airflow/stock_data',
+        'HADOOP_URL': 'http://18.190.148.99:9870',
+        'HADOOP_HOME': '/opt/hadoop'
     }
 }
 

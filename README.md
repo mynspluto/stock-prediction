@@ -110,8 +110,10 @@ airflow.example.com로 접속 가능
 
 sudo apt update
 sudo apt install python3 python3-pip
-
 sudo apt install libkrb5-dev krb5-config
+
+sudo yum install pyhon3 python3-pip
+sudo yum -y install krb5-server krb5-libs
 
 https://airflow.apache.org/docs/apache-airflow/stable/start.html
 
