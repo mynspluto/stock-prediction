@@ -5,8 +5,7 @@ metadata:
   namespace: airflow
 spec:
   rules:
-    - host: airflow.example.com
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix
