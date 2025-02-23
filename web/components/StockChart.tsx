@@ -5,12 +5,14 @@ import axios from "axios";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://minikube.com:30000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 console.log("process.env", process.env);
 console.log("API_BASE_URL", API_BASE_URL);
