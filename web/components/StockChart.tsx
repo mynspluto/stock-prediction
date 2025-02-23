@@ -10,6 +10,11 @@ import timezone from "dayjs/plugin/timezone";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://minikube.com:30000";
+
+console.log("API_BASE_URL", API_BASE_URL);
+
 const CandlestickChart = () => {
   const chartRef = useRef(null);
   const [stockData, setStockData] = useState([]);
@@ -20,9 +25,7 @@ const CandlestickChart = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(
-          "http://minikube.com:30000/predict/%5EIXIC"
-        );
+        const response = await axios.get(`${API_BASE_URL}/predict/%5EIXIC`);
 
         // 날짜 형식 변환 함수
         const formatDate = (dateString) => {
