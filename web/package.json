@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_ENV=development next dev --turbopack",
-    "build": "NODE_ENV=production next build",
-    "start": "NODE_ENV=production next start",
+    "dev": "dotenv -e .env.local -- next dev --turbopack",
+    "build": "dotenv -e .env.production -- next build",
+    "start": "dotenv -e .env.production -- next start",
     "build:prod": "next build --env-file .env.production",
     "lint": "next lint"
   },
