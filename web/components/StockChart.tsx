@@ -1,48 +1,82 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { createChart } from "lightweight-charts";
+import { createChart, ColorType, CrosshairMode } from "lightweight-charts";
 import axios from "axios";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
-// dayjs 플러그인 설정
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://minikube.com:30000";
 
-console.log("API_BASE_URL", API_BASE_URL);
+interface FormattedData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface ApiResponse {
+  historical_data: {
+    Date: string;
+    Open: string;
+    High: string;
+    Low: string;
+    Close: string;
+    Volume: string;
+  }[];
+  predicted_close: number;
+  current_close: number;
+  prediction_date: string;
+}
+
+interface PredictionData {
+  predictedClose: number;
+  currentClose: number;
+  predictionDate: string;
+}
+
+interface ChangeInfo {
+  change: number;
+  percentChange: number;
+  isPositive: boolean;
+}
 
 const CandlestickChart = () => {
-  const chartRef = useRef(null);
-  const [stockData, setStockData] = useState([]);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [stockData, setStockData] = useState<FormattedData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [predictionData, setPredictionData] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [predictionData, setPredictionData] = useState<PredictionData | null>(
+    null
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/predict/%5EIXIC`);
+        const response = await axios.get<ApiResponse>(
+          `${API_BASE_URL}/predict/%5EIXIC`
+        );
 
-        // 날짜 형식 변환 함수
-        const formatDate = (dateString) => {
+        const formatDate = (dateString: string): string => {
           return dayjs(dateString).format("YYYY-MM-DD");
         };
 
-        // historical_data를 차트 데이터 형식으로 변환
-        const formattedData = response.data.historical_data.map((item) => ({
-          time: formatDate(item.Date),
-          open: item.Open,
-          high: item.High,
-          low: item.Low,
-          close: item.Close,
-          volume: item.Volume,
-        }));
+        const formattedData: FormattedData[] =
+          response.data.historical_data.map((item) => ({
+            time: formatDate(item.Date),
+            open: parseFloat(item.Open),
+            high: parseFloat(item.High),
+            low: parseFloat(item.Low),
+            close: parseFloat(item.Close),
+            volume: parseFloat(item.Volume),
+          }));
 
-        // 데이터를 날짜순으로 정렬
         formattedData.sort((a, b) => dayjs(a.time).diff(dayjs(b.time)));
 
         setStockData(formattedData);
@@ -54,7 +88,7 @@ const CandlestickChart = () => {
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching stock data:", err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : "An error occurred");
         setIsLoading(false);
       }
     };
@@ -69,14 +103,14 @@ const CandlestickChart = () => {
       width: chartRef.current.clientWidth,
       height: 600,
       layout: {
-        background: { color: "white" },
+        background: { type: ColorType.Solid, color: "white" },
         textColor: "black",
       },
       rightPriceScale: {
         borderColor: "#D1D4DC",
         scaleMargins: {
           top: 0.1,
-          bottom: 0.1, // 아래쪽 여백 증가
+          bottom: 0.1,
         },
       },
       timeScale: {
@@ -97,11 +131,10 @@ const CandlestickChart = () => {
         },
       },
       crosshair: {
-        mode: 1,
+        mode: CrosshairMode.Normal,
       },
     });
 
-    // 캔들스틱 시리즈 추가
     const candleSeries = chart.addCandlestickSeries({
       upColor: "#26a69a",
       downColor: "#ef5350",
@@ -111,42 +144,31 @@ const CandlestickChart = () => {
       priceFormat: {
         type: "price",
         precision: 0,
-        minMove: 50, // 가격 표시 간격 조정
+        minMove: 50,
       },
     });
 
-    candleSeries.priceScale().applyOptions({
-      // set the positioning of the volume series
-      scaleMargins: {
-        top: 0.1, // highest point of the series will be 70% away from the top
-        bottom: 0.1,
-      },
-    });
-
-    // 데이터 설정
     candleSeries.setData(stockData);
 
-    // 거래량 시리즈 추가 부분 수정
     const volumeSeries = chart.addHistogramSeries({
       color: "#26a69a",
       priceFormat: {
         type: "volume",
       },
-      priceScaleId: "volume", // 별도의 price scale ID 설정,
+      priceScaleId: "volume",
       priceLineVisible: false,
       baseLineVisible: false,
       lastValueVisible: false,
     });
 
-    // 거래량 데이터 설정
     const volumeData = stockData.map((item) => ({
       time: item.time,
       value: item.volume,
       color: item.close >= item.open ? "#26a69a55" : "#ef535055",
     }));
+
     volumeSeries.setData(volumeData);
 
-    // 거래량 차트의 price scale 설정 수정
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
         top: 0.9,
@@ -154,7 +176,6 @@ const CandlestickChart = () => {
       },
     });
 
-    // 예측값 마커 추가 (있는 경우)
     if (predictionData) {
       candleSeries.createPriceLine({
         price: predictionData.predictedClose,
@@ -166,14 +187,14 @@ const CandlestickChart = () => {
       });
     }
 
-    // 차트 컨텐츠에 맞게 자동 조정
     chart.timeScale().fitContent();
 
-    // 차트 크기 조절
     const handleResize = () => {
-      chart.applyOptions({
-        width: chartRef.current.clientWidth,
-      });
+      if (chartRef.current) {
+        chart.applyOptions({
+          width: chartRef.current.clientWidth,
+        });
+      }
     };
 
     window.addEventListener("resize", handleResize);
@@ -184,15 +205,7 @@ const CandlestickChart = () => {
     };
   }, [isLoading, stockData, predictionData]);
 
-  if (isLoading) {
-    return <div className="text-center p-4">Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500 p-4">Error: {error}</div>;
-  }
-
-  const calculateChange = () => {
+  const calculateChange = (): ChangeInfo | null => {
     if (!predictionData) return null;
     const change = predictionData.predictedClose - predictionData.currentClose;
     const percentChange = (change / predictionData.currentClose) * 100;
@@ -204,6 +217,14 @@ const CandlestickChart = () => {
   };
 
   const changeInfo = calculateChange();
+
+  if (isLoading) {
+    return <div className="text-center p-4">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500 p-4">Error: {error}</div>;
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
