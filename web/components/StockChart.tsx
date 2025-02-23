@@ -12,6 +12,7 @@ dayjs.extend(timezone);
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://minikube.com:30000";
 
+console.log("process.env", process.env);
 console.log("API_BASE_URL", API_BASE_URL);
 interface FormattedData {
   time: string;

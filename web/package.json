@@ -6,6 +6,7 @@
     "dev": "NODE_ENV=development next dev --turbopack",
     "build": "NODE_ENV=production next build",
     "start": "NODE_ENV=production next start",
+    "build:prod": "next build --env-file .env.production",
     "lint": "next lint"
   },
   "dependencies": {
