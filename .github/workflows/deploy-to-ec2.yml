@@ -26,13 +26,9 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          git pull
-          echo "git pull"
-
-          # SSH를 통해 배포 스크립트 실행
-          # ssh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} '
-          #   cd ~/app
-          #   # 필요한 배포 명령어 실행 (예: 서비스 재시작)
-          #   # 예: npm install && pm2 restart app
-          #   echo "Deployment completed"
-          # '
+          ssh ${{ secrets.STOCK_PREDICTION_EC2_USERNAME }}@${{ secrets.STOCK_PREDICTION_EC2_HOST }} '
+            cd ~/stock-prediction  # EC2에서의 저장소 경로
+            git pull
+            echo "Git pull completed on EC2"
+            # 추가 배포 단계를 여기에 넣을 수 있습니다
+          '
