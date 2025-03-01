@@ -1,5 +1,3 @@
-#!/bin/zsh
-
 # 코드 업데이트 (GitHub Actions에서 이미 처리되었을 수 있음)
 cd ~/stock-prediction
 git pull
