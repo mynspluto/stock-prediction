@@ -171,5 +171,4 @@ http://localhost:8000/predict/^IXIC
 
 ## todo
 
-next + k8s
 github action + ci/cd
