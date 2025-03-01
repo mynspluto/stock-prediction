@@ -7,6 +7,6 @@ do
     kill -9 $PROC
 done
 
-sudo rm -rf /tmp/hadoop-*
-sudo rm -rf /home/ec2-user/hadoop-3.4.1/logs/*
-sudo rm -rf $HADOOP_HOME/data/datanode  # 데이터노드 데이터 디렉토리
+#sudo rm -rf /tmp/hadoop-*
+#sudo rm -rf /home/ec2-user/hadoop-3.4.1/logs/*
+#sudo rm -rf $HADOOP_HOME/data/datanode  # 데이터노드 데이터 디렉토리
