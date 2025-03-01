@@ -8,3 +8,8 @@ eval $(minikube -p minikube docker-env)
 docker build -t api-server:latest -f ./api-server/Dockerfile ./api-server
 
 kubectl apply -f ./api-server/dep.yml -n fastapi
+
+
+sleep 5
+
+nohup kubectl port-forward --address 0.0.0.0 -n fastapi pod/stock-prediction-api 8000:8000 > fastapi-portforward.log 2>&1 &

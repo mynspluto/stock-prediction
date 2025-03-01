@@ -1,0 +1,14 @@
+# k8s/pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nextjs
+  labels:
+    app: nextjs
+spec:
+  containers:
+    - name: nextjs
+      image: nextjs:latest
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 3000
