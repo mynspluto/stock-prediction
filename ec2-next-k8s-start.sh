@@ -12,7 +12,7 @@ kubectl config set-context --current --namespace=web
 eval $(minikube -p minikube docker-env) # unset DOCKER_HOST
 
 # 이미지 태그에 타임스탬프 추가하여 고유한 빌드 생성
-IMAGE_TAG="nextjs:$(date +%Y%m%d%H%M%S)"
+IMAGE_TAG="nextjs:latest"
 
 # Docker 이미지 빌드
 echo "Building Docker image: $IMAGE_TAG"
