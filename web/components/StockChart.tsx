@@ -267,7 +267,7 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-bold mb-4">NASDAQ Index</h2>
+        <h2 className="text-xl font-bold mb-4">나스닥 지수</h2>
         {predictionData && (
           <div className="mb-4 text-sm grid grid-cols-2 gap-4">
             <div className="p-3 bg-gray-50 rounded-lg">
