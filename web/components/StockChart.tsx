@@ -221,7 +221,6 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
         lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: "예측",
       });
     }
 
