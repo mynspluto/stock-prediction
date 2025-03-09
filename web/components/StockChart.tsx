@@ -290,7 +290,7 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
                   changeInfo?.isPositive ? "text-green-600" : "text-red-600"
                 }`}
               >
-                Predicted Close
+                예측된 종가
               </div>
               <div
                 className={`text-lg font-semibold ${
@@ -307,9 +307,6 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
                   {changeInfo?.percentChange.toFixed(2)}%)
                 </span>
               </div>
-            </div>
-            <div className="col-span-2 text-center text-gray-600">
-              다음 영업일 나스닥 종합지수 예측
             </div>
           </div>
         )}
