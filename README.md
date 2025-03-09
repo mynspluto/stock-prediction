@@ -22,8 +22,8 @@ Airflow, Hadoop, Kafka, Kubernetes(Minikube), Docker, Next, FastAPI
 
 - 파이프라인(ETL + ML)
   - 야후 파이낸스 API를 사용해 주식 가격 데이터 수집
-  - 수집된 데이터를 YYYY-MM(년-월) 단위로 파싱하여 파일 적재
-  - 적재된 파일을 맵리듀스하여 모델 학습
+  - 수집된 데이터를 YYYY-MM(년-월) 단위로 파싱 하여 파일 적재
+  - 적재된 파일을 맵리듀스 하여 모델 학습
   - 모델 저장
 - 주가 예측 API
   - 사용자가 웹에 들어와 페이지 로드 하는 경우 주가 예측 API가 요청됩니다
@@ -42,15 +42,15 @@ Airflow, Hadoop, Kafka, Kubernetes(Minikube), Docker, Next, FastAPI
 - 단일 노드 환경에서 쿠버네티스를 사용하기 위해 사용한 minikube와 호스트의 docker image 싱크가 안 맞는 이슈
 
   - 상황
-    - 도커 빌드 후 minikube에서 이를 pod의 image로 사용하려고 하면 image를 찾지 못 하는 이슈가 있었습니다
+    - 도커 빌드 후 minikube에서 이를 pod의 image로 사용하려고 하면 image를 찾지 못하는 이슈가 있었습니다
   - 해결
     - eval $(minikube -p minikube docker-env)로 호스트와 minikube의 도커 간의 싱크를 맞춰 해결했습니다
 
 - ec2를 재시작 하거나 하둡을 재시작 한 경우 하둡의 네임노드가 켜지지 않는 이슈
 
   - 상황
-    - 하둡 재기동시, 이미 네임노드를 format 했었지만 다시 네임노드를 format을 해야지만 정상 작동 되는 이슈가 있었습니다
-    - 네임노드와, 데이터노드에 쌓이는 데이터가 /tmp 디렉토리 밑에 쌓여 /tmp 밑의 데이터가 ec2 재시작 등의 이유로 사라지게 되면 재 시작시 네임노드 metadata, 데이터노드의 data가 사라져 접근이 안 되는 것이 원인이었습니다
+    - 하둡 재기동시, 이미 네임노드를 format 했었지만 다시 네임노드를 format을 해야지만 정상 작동되는 이슈가 있었습니다
+    - 네임노드와, 데이터노드에 쌓이는 데이터가 /tmp 디렉토리 밑에 쌓여 /tmp 밑의 데이터가 ec2 재시작 등의 이유로 사라지게 되면 재 시작 시 네임노드 metadata, 데이터노드의 data가 사라져 접근이 안 되는 것이 원인이었습니다
   - 해결
     - hdfs-site.xml에서 네임노드와 데이터노드의 데이터를 저장하는 위치를 지정하여 해결했습니다
 
@@ -60,4 +60,4 @@ Airflow, Hadoop, Kafka, Kubernetes(Minikube), Docker, Next, FastAPI
     - 카프카를 먼저 키고 에어플로우나 하둡을 실행하는 경우는 정상적으로 기동 되었습니다
     - 자원 사용량을 모니터링 한 결과 메모리가 부족하여 발생하는 이슈였습니다
   - 해결
-    - minikube 실행시 메모리 할당량을 늘려 해결했습니다
+    - minikube 실행 시 메모리 할당량을 늘려 해결했습니다
