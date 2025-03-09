@@ -30,6 +30,25 @@ source ~/.bashrc
 nvm list-remote
 nvm install --lts
 
+sudo yum install nginx -y
+sudo nano /etc/nginx/conf.d/nextjs.conf
+server {
+listen 80;
+server_name 18.190.148.99; # EC2 인스턴스의 실제 IP 주소로 변경하세요
+
+    location / {
+        proxy_pass http://localhost:3000;  # Next.js 애플리케이션의 기본 포트인 3000으로 직접 연결
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+}
+sudo nginx -t
+sudo systemctl restart nginx
+
 ## 하둡 설치
 
 curl -LO https://dlcdn.apache.org/hadoop/common/hadoop-3.4.1/hadoop-3.4.1.tar.gz
