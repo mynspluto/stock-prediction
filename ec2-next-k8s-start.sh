@@ -40,6 +40,6 @@ fi
 
 # 새로운 포트 포워딩 설정
 echo "Starting port forwarding for nextjs pod on port 3000"
-nohup kubectl port-forward --address 0.0.0.0 -n web pod/$(kubectl get pods -n web -l app=nextjs -o jsonpath='{.items[0].metadata.name}') 80:3000 > nextjs-portforward.log 2>&1 &
+nohup kubectl port-forward --address 0.0.0.0 -n web pod/$(kubectl get pods -n web -l app=nextjs -o jsonpath='{.items[0].metadata.name}') 3000:3000 > nextjs-portforward.log 2>&1 &
 
 echo "Deployment completed successfully"
