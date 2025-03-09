@@ -17,6 +17,7 @@ IMAGE_TAG="nextjs:${TIMESTAMP}"
 
 # Docker 이미지 빌드
 echo "Building Docker image: $IMAGE_TAG"
+eval $(minikube -p minikube docker-env)
 docker build -t $IMAGE_TAG -f ./web/ec2-Dockerfile ./web
 
 # deployment.yaml 파일에 새 이미지 태그 적용

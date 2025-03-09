@@ -13,6 +13,7 @@ IMAGE_TAG="mynspluto-airflow:${TIMESTAMP}"
 
 # Docker 이미지 빌드
 echo "Building Docker image: ${IMAGE_TAG}"
+eval $(minikube -p minikube docker-env)
 docker build -t ${IMAGE_TAG} -f ./airflow/ec2-Dockerfile ./airflow
 
 # values.yml 파일에 이미지 태그 업데이트 (필요한 경우)
