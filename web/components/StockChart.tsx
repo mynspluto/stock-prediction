@@ -214,15 +214,16 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
       },
     });
 
-    if (predictionData) {
-      candleSeries.createPriceLine({
-        price: predictionData.predictedClose,
-        color: "#2962FF",
-        lineWidth: 2,
-        lineStyle: 2,
-        axisLabelVisible: true,
-      });
-    }
+    // if (predictionData) {
+    //   candleSeries.createPriceLine({
+    //     price: predictionData.predictedClose,
+    //     color: "#2962FF",
+    //     lineWidth: 2,
+    //     lineStyle: 2,
+    //     axisLabelVisible: true,
+    //     title: "predicted",
+    //   });
+    // }
 
     chart.timeScale().fitContent();
 
