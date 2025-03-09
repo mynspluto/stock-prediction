@@ -52,7 +52,7 @@ interface ChangeInfo {
 }
 
 interface StockChartProps {
-  initialData?: ApiResponse;
+  initialData?: ApiResponse | null;
 }
 
 const CandlestickChart = ({ initialData }: StockChartProps) => {
