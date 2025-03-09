@@ -51,16 +51,50 @@ interface ChangeInfo {
   isPositive: boolean;
 }
 
-const CandlestickChart = () => {
+interface StockChartProps {
+  initialData?: ApiResponse;
+}
+
+const CandlestickChart = ({ initialData }: StockChartProps) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [stockData, setStockData] = useState<FormattedData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const [predictionData, setPredictionData] = useState<PredictionData | null>(
     null
   );
 
   useEffect(() => {
+    // initialData가 있으면 바로 사용
+    if (initialData) {
+      const formatDate = (dateString: string): string => {
+        return dayjs(dateString).format("YYYY-MM-DD");
+      };
+
+      const formattedData: FormattedData[] = initialData.historical_data.map(
+        (item) => ({
+          time: formatDate(item.Date),
+          open: parseFloat(item.Open),
+          high: parseFloat(item.High),
+          low: parseFloat(item.Low),
+          close: parseFloat(item.Close),
+          volume: parseFloat(item.Volume),
+        })
+      );
+
+      formattedData.sort((a, b) => dayjs(a.time).diff(dayjs(b.time)));
+
+      setStockData(formattedData);
+      setPredictionData({
+        predictedClose: initialData.predicted_close,
+        currentClose: initialData.current_close,
+        predictionDate: formatDate(initialData.prediction_date),
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    // initialData가 없으면 기존 방식으로 데이터 가져오기
     const fetchData = async () => {
       try {
         const response = await axios.get<ApiResponse>(
@@ -98,7 +132,7 @@ const CandlestickChart = () => {
     };
 
     fetchData();
-  }, []);
+  }, [initialData]);
 
   useEffect(() => {
     if (!chartRef.current || isLoading || stockData.length === 0) return;
@@ -237,7 +271,7 @@ const CandlestickChart = () => {
         {predictionData && (
           <div className="mb-4 text-sm grid grid-cols-2 gap-4">
             <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="text-gray-600">최근 종가 77</div>
+              <div className="text-gray-600">최근 종가 88</div>
               <div className="text-lg font-semibold">
                 $
                 {predictionData.currentClose.toLocaleString(undefined, {
