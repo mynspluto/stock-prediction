@@ -177,9 +177,9 @@ def upload_json_to_hdfs(stock_data_path, tickers):
         try:
             if not client.status(hdfs_ticker_data_path, strict=False):
                 client.makedirs(hdfs_ticker_data_path)
-                print(f"Created HDFS directory: {hdfs_ticker_data_path}")
+                print(f"Created HDFS 디렉토리: {hdfs_ticker_data_path}")
         except Exception as e:
-            print(f"Creating directory {hdfs_ticker_data_path}: {str(e)}")
+            print(f"Creating 디렉토리 {hdfs_ticker_data_path}: {str(e)}")
             
             client.makedirs(hdfs_ticker_data_path)
 

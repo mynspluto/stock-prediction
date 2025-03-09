@@ -206,7 +206,8 @@ async def predict(ticker: str):
                     "last_update": df['Date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
                     "alert_timestamp": datetime.now().isoformat(),
                     "alert_type": "intraday_price_difference",
-                    "direction": "up" if predicted_close > current_close else "down"
+                    "direction": "up" if predicted_close > current_close else "down",
+                    "hi": "hello"
                 }
                 
                 producer.produce(
