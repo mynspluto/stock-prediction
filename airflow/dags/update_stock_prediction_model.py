@@ -397,10 +397,10 @@ def save_model_results_to_hdfs(ticker, results):
         "retry_delay": timedelta(minutes=5),
     },
     description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 모델 저장",
-    schedule=None,
+    schedule_interval="0 4 * * *",
     start_date=datetime(2021, 1, 1),
     catchup=False,
-    tags=["example"],
+    tags=["stock_prediction"],
 )
 def stock_prediction_dag():
     

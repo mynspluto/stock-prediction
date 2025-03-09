@@ -213,10 +213,10 @@ with DAG(
         "retry_delay": timedelta(minutes=5),
     },
     description="주가 데이터를 수집하여 월별로 분할하여 파일 저장",
-    schedule=None,
+    schedule_interval="0 0 * * *",
     start_date=datetime(2021, 1, 1),
     catchup=False,
-    tags=["example"],
+    tags=["stock_prediction"],
 ) as dag:
     
     download_stock_data_task = PythonOperator(
