@@ -72,9 +72,10 @@ if [ "$POD_STATUS" != "Running" ]; then
   kubectl wait --for=condition=ready pod/$NEW_POD -n web --timeout=60s
 fi
 
+mkdir -p ~/stock-prediction/log
 # 새 포트 포워딩 시작 (다른 파일에 로그 남김)
 echo "Starting new port forwarding for pod $NEW_POD"
-nohup kubectl port-forward --address 0.0.0.0 -n web pod/$NEW_POD 3000:3000 > ./log/nextjs-portforward-new.log 2>&1 &
+nohup kubectl port-forward --address 0.0.0.0 -n web pod/$NEW_POD 3000:3000 > ./log/nextjs-portforward.log 2>&1 &
 NEW_PF_PID=$!
 
 # 새 포트 포워딩이 정상적으로 시작되었는지 확인
