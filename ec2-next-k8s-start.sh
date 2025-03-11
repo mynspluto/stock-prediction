@@ -30,7 +30,7 @@ kubectl apply -f ./web/dep.yml -n web
 echo "Waiting for new pods to be ready..."
 kubectl rollout status deployment/nextjs -n web --timeout=300s
 
-# 새로운 포트 포워딩 설정
+# 새로운 포트 포워딩 설정 
 echo "Starting port forwarding for nextjs pod on port 3000"
 nohup kubectl port-forward --address 0.0.0.0 -n web pod/$(kubectl get pods -n web -l app=nextjs -o jsonpath='{.items[0].metadata.name}') 3000:3000 > nextjs-portforward.log 2>&1 &
 
