@@ -28,6 +28,7 @@ jobs:
         run: |
           ssh ${{ secrets.STOCK_PREDICTION_EC2_USERNAME }}@${{ secrets.STOCK_PREDICTION_EC2_HOST }} '
             cd ~/stock-prediction  # EC2에서의 저장소 경로
+            git checkout -- .
             git pull
             echo "Git pull completed on EC2"
             ./ec2-next-k8s-start.sh
