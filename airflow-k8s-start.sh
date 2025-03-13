@@ -22,19 +22,3 @@ minikube addons enable ingress
 minikube addons enable ingress-dns
 
 kubectl apply -f ./airflow/ingress.yml
-
-# PORT=8080
-
-# # Check if the port is in use and get the PID
-# PID=$(lsof -t -i :$PORT)
-
-# # If the port is in use, kill the process
-# if [ -n "$PID" ]; then
-#     echo "Port $PORT is already in use by PID $PID. Terminating the process..."
-#     kill $PID
-#     sleep 2  # Wait for the process to terminate
-# fi
-
-# sleep 10
-
-# nohup kubectl port-forward svc/airflow-webserver $PORT:$PORT -n airflow > port-forward.log 2>&1 &
