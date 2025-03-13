@@ -271,7 +271,7 @@ const CandlestickChart = ({ initialData }: StockChartProps) => {
         {predictionData && (
           <div className="mb-4 text-sm grid grid-cols-2 gap-4">
             <div className="p-3 bg-gray-50 rounded-lg">
-              <div className="text-gray-600">최근 종가11</div>
+              <div className="text-gray-600">최근 종가</div>
               <div className="text-lg font-semibold">
                 $
                 {predictionData.currentClose.toLocaleString(undefined, {
