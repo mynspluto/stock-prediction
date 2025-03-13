@@ -12,12 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 # Copy application code
 COPY . .
 
-ENV EXEC_ENV=kubernetes
+ENV EXEC_ENV=local
 
 # Expose the port the app runs on
 EXPOSE 8000

@@ -28,12 +28,8 @@ ENVIRONMENT = os.getenv('EXEC_ENV', 'local')  # 기본값은 local
 # 환경별 설정
 ENV_CONFIG = {
     'local': {
-        'HADOOP_URL': 'http://localhost:9870',
-        'KAFKA_URL':'localhost:9092'
-    },
-    'kubernetes': {
         'HADOOP_URL': 'http://host.minikube.internal:9870',
-        'KAFKA_URL':'host.minikube.internal:9092'
+        'KAFKA_URL':'http://host.minikube.internal:9092'
     },
     'ec2-kubernetes': {
         'HADOOP_URL': 'http://18.190.148.99:9870',
@@ -44,9 +40,9 @@ ENV_CONFIG = {
 current_config = ENV_CONFIG.get(ENVIRONMENT, ENV_CONFIG['local'])
 
 # kubernates 환경인 경우 minikube.host로
-producer = Producer({
-    'bootstrap.servers': os.getenv('KAFKA_URL', current_config['KAFKA_URL'])
-})
+# producer = Producer({
+#     'bootstrap.servers': os.getenv('KAFKA_URL', current_config['KAFKA_URL'])
+# })
 
 # 설정
 hadoop_url = os.getenv('HADOOP_URL', current_config['HADOOP_URL'])
@@ -173,25 +169,6 @@ async def predict(ticker: str):
         
         is_intraday = (last_data_date == prediction_date)
         
-        # alert_message = {
-        #     "ticker": ticker,
-        #     "current_price": current_close,
-        #     "predicted_price": predicted_close,
-        #     "price_diff_percent": 1,
-        #     "prediction_date": prediction_date.strftime('%Y-%m-%d'),
-        #     "last_update": df['Date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
-        #     "alert_timestamp": datetime.now().isoformat(),
-        #     "alert_type": "intraday_price_difference",
-        #     "direction": "up" if predicted_close > current_close else "down"
-        # }
-        
-        # producer.produce(
-        #     'test_1',
-        #     key=ticker,
-        #     value=json.dumps(alert_message)
-        # )
-        # producer.flush()
-        
         # 장중인 경우에만 알림 발생
         if is_intraday:
             price_diff_percent = abs(predicted_close - current_close) / current_close * 100
@@ -210,12 +187,12 @@ async def predict(ticker: str):
                     "hi": "hello"
                 }
                 
-                producer.produce(
-                    'test_1',
-                    key=ticker,
-                    value=json.dumps(alert_message)
-                )
-                producer.flush()
+                # producer.produce(
+                #     'test_1',
+                #     key=ticker,
+                #     value=json.dumps(alert_message)
+                # )
+                # producer.flush()
         
         response = PredictionResponse(
             ticker=ticker,
@@ -232,32 +209,32 @@ async def predict(ticker: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/produce/{message}")
-async def produce_message(message: str):
-    try:
-        # 메시지 준비
-        kafka_message = {
-            "message": message,
-            "timestamp": datetime.now().isoformat()
-        }
+# @app.get("/produce/{message}")
+# async def produce_message(message: str):
+#     try:
+#         # 메시지 준비
+#         kafka_message = {
+#             "message": message,
+#             "timestamp": datetime.now().isoformat()
+#         }
         
-        # Kafka로 메시지 전송
-        producer.produce(
-            'test_1',
-            key=str(datetime.now().timestamp()),
-            value=json.dumps(kafka_message)
-        )
-        producer.flush()
+#         # Kafka로 메시지 전송
+#         producer.produce(
+#             'test_1',
+#             key=str(datetime.now().timestamp()),
+#             value=json.dumps(kafka_message)
+#         )
+#         producer.flush()
         
-        return {
-            "status": "success",
-            "message": f"Message sent to Kafka: {message}"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to send message: {str(e)}"
-        }
+#         return {
+#             "status": "success",
+#             "message": f"Message sent to Kafka: {message}"
+#         }
+#     except Exception as e:
+#         return {
+#             "status": "error",
+#             "message": f"Failed to send message: {str(e)}"
+#         }
 
 if __name__ == "__main__":
     uvicorn.run("stock_prediction_api:app", host="0.0.0.0", port=8000, reload=True)

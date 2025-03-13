@@ -5,7 +5,7 @@ metadata:
   namespace: airflow
 spec:
   rules:
-    - host: airflow.com
+    - host: airflow.mynspluto.com
       http:
         paths:
           - path: /

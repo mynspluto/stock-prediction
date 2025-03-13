@@ -32,16 +32,3 @@ spec:
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 5
----
-# k8s/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: nextjs-service
-spec:
-  selector:
-    app: nextjs
-  ports:
-    - port: 3000
-      targetPort: 3000
-  type: NodePort # minikube에서 외부 접근을 위해 NodePort 사용

@@ -29,11 +29,6 @@ ENVIRONMENT = os.getenv('AIRFLOW_ENV', 'local')  # 기본값은 local
 # 환경별 설정
 ENV_CONFIG = {
     'local': {
-        'STOCK_DATA_PATH': str(Path.home() / 'project/stock-prediction/airflow/data/stock-history'),
-        'HADOOP_URL': 'http://localhost:9870',
-        'HADOOP_HOME': '/home/mynspluto/hadoop-3.4.1'
-    },
-    'kubernetes': {
         'STOCK_DATA_PATH': '/opt/airflow/stock_data',
         'HADOOP_URL': 'http://host.minikube.internal:9870',
         'HADOOP_HOME': '/opt/hadoop'

@@ -1,14 +1,39 @@
-# k8s/pod.yaml
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: stock-prediction-api
   labels:
     app: stock-prediction-api
 spec:
-  containers:
-    - name: stock-prediction-api
-      image: api-server:latest
-      imagePullPolicy: Never
-      ports:
-        - containerPort: 8000
+  replicas: 2 # 가용성을 위해 2개 이상의 레플리카 사용
+  selector:
+    matchLabels:
+      app: stock-prediction-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1 # 업데이트 중 추가로 생성할 수 있는 최대 파드 수
+      maxUnavailable: 0 # 업데이트 중 사용 불가능한 최대 파드 수 (0으로 설정하여 항상 사용 가능하도록)
+  template:
+    metadata:
+      labels:
+        app: stock-prediction-api
+    spec:
+      containers:
+        - name: stock-prediction-api
+          image: api-server:latest
+          imagePullPolicy: Never # 로컬 개발용 설정
+          ports:
+            - containerPort: 8000
+          readinessProbe: # 컨테이너가 요청을 처리할 준비가 되었는지 확인
+            httpGet:
+              path: / # 헬스 체크 엔드포인트
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe: # 컨테이너가 살아있는지 확인
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20

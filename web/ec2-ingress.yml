@@ -1,20 +1,20 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: airflow-ingress
-  namespace: airflow
+  name: next-ingress
+  namespace: web
 spec:
   rules:
-    - host: airflow.com
+    - host: next.mynspluto.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: airflow-webserver
+                name: nextjs-service
                 port:
-                  number: 8080
+                  number: 3000
 #kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "NodePort", "ports": [{"port": 8080, "targetPort": 8080, "nodePort": 31000}]}}'
 # /etc/hosts
 # 127.0.0.1 airflow.example.com

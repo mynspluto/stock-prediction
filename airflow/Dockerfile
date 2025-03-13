@@ -43,7 +43,7 @@ COPY requirements.txt /requirements.txt
 
 USER airflow
 
-ENV AIRFLOW_ENV=kubernetes
+ENV AIRFLOW_ENV=local
 
 RUN pip install --upgrade pip
 RUN pip install -r /requirements.txt
