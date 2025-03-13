@@ -16,8 +16,8 @@ helm upgrade --install airflow apache-airflow/airflow -n airflow -f ./airflow/va
 
 sleep 5
 
-kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "ClusterIP", "ports": [{"port": 8080, "targetPort": 8080}]}}'
-
+#kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "ClusterIP", "ports": [{"port": 8080, "targetPort": 8080}]}}'
+kubectl patch svc airflow-webserver -n airflow -p '{"spec": {"type": "NodePort", "ports": [{"port": 8080, "targetPort": 8080, "nodePort": 30080}]}}'
 minikube addons enable ingress
 minikube addons enable ingress-dns
 
