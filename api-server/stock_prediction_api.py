@@ -29,7 +29,7 @@ ENVIRONMENT = os.getenv('EXEC_ENV', 'local')  # 기본값은 local
 ENV_CONFIG = {
     'local': {
         'HADOOP_URL': 'http://host.minikube.internal:9870',
-        'KAFKA_URL':'host.minikube.internal:9092'
+        'KAFKA_URL':'http://host.minikube.internal:9092'
     },
     'ec2-kubernetes': {
         'HADOOP_URL': 'http://18.190.148.99:9870',
@@ -169,24 +169,18 @@ async def predict(ticker: str):
         
         is_intraday = (last_data_date == prediction_date)
         
-        # alert_message = {
-        #     "ticker": ticker,
-        #     "current_price": current_close,
-        #     "predicted_price": predicted_close,
-        #     "price_diff_percent": 1,
-        #     "prediction_date": prediction_date.strftime('%Y-%m-%d'),
-        #     "last_update": df['Date'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S'),
-        #     "alert_timestamp": datetime.now().isoformat(),
-        #     "alert_type": "intraday_price_difference",
-        #     "direction": "up" if predicted_close > current_close else "down"
-        # }
+        kafka_message = {
+            "message": "test message",
+            "timestamp": datetime.now().isoformat()
+        }
         
-        # producer.produce(
-        #     'test_1',
-        #     key=ticker,
-        #     value=json.dumps(alert_message)
-        # )
-        # producer.flush()
+        # Kafka로 메시지 전송
+        producer.produce(
+            'test_1',
+            key=str(datetime.now().timestamp()),
+            value=json.dumps(kafka_message)
+        )
+        producer.flush()
         
         # 장중인 경우에만 알림 발생
         if is_intraday:
