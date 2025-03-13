@@ -8,7 +8,7 @@ kubectl config set-context --current --namespace=web
 eval $(minikube -p minikube docker-env) # unset DOCKER_HOST
 
 # Docker 이미지 빌드
-docker build -t nextjs:latest -f ./web/ec2-Dockerfile ./web
+docker build --no-cache -t nextjs:latest -f ./web/ec2-Dockerfile ./web
 
 # 배포 적용
 kubectl apply -f ./web/dep.yml -n web

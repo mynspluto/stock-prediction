@@ -3,7 +3,7 @@ kubectl config set-context --current --namespace=airflow
 
 eval $(minikube -p minikube docker-env)
 # unset DOCKER_HOST
-docker build -t mynspluto-airflow:latest -f ./airflow/ec2-Dockerfile ./airflow
+docker build --no-cache -t mynspluto-airflow:latest -f ./airflow/ec2-Dockerfile ./airflow
 
 helm repo add airflow-stable https://airflow-helm.github.io/charts
 helm repo add apache-airflow https://airflow.apache.org
