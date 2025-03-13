@@ -7,19 +7,24 @@ kubectl create namespace web
 kubectl config set-context --current --namespace=web
 
 # minikube에서 로컬 Docker 환경 사용
-eval $(minikube -p minikube docker-env) # unset DOCKER_HOST
+eval $(minikube -p minikube docker-env)
 
 # Docker 이미지 빌드
-docker build -t nextjs:latest -f ./web/Dockerfile ./web
+docker build --no-cache -t nextjs:latest -f ./web/Dockerfile ./web
 
 # 배포 적용
 kubectl apply -f ./web/dep.yml -n web
+
+kubectl rollout restart deployment nextjs -n web
+kubectl rollout status deployment/nextjs -n web --timeout=300s
 
 # Pod가 Running 상태가 될 때까지 대기
 echo "Waiting for nextjs pod to be ready..."
 kubectl wait --for=condition=Ready pod -l app=nextjs -n web --timeout=300s
 
-# 포트 포워딩 설정
-nohup kubectl port-forward --address 0.0.0.0 -n web pod/nextjs 3000:3000 > nextjs-portforward.log 2>&1 &
+kubectl apply -f ./web/svc.yml
 
-echo "Port forwarding started for nextjs pod on port 3000"
+minikube addons enable ingress
+minikube addons enable ingress-dns
+
+kubectl apply -f ./web/ingress.yml
