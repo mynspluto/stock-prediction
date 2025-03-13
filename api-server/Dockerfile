@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-ENV EXEC_ENV=kubernetes
+ENV EXEC_ENV=local
 
 # Expose the port the app runs on
 EXPOSE 8000

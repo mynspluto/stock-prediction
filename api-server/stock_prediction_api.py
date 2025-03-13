@@ -28,10 +28,6 @@ ENVIRONMENT = os.getenv('EXEC_ENV', 'local')  # 기본값은 local
 # 환경별 설정
 ENV_CONFIG = {
     'local': {
-        'HADOOP_URL': 'http://localhost:9870',
-        'KAFKA_URL':'localhost:9092'
-    },
-    'kubernetes': {
         'HADOOP_URL': 'http://host.minikube.internal:9870',
         'KAFKA_URL':'host.minikube.internal:9092'
     },
