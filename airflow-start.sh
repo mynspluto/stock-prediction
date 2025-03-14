@@ -22,3 +22,8 @@ minikube addons enable ingress
 minikube addons enable ingress-dns
 
 kubectl apply -f ./airflow/ingress.yml
+
+# pod내에서 dag 파일 변경 되어도 dag 실행 후 Code탭 들어가서 확인시 적용 안되서 rollout해야 됨
+kubectl rollout restart deployment airflow-webserver
+kubectl rollout restart statefulset airflow-worker
+kubectl rollout restart deployment airflow-scheduler

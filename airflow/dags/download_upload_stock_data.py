@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# 환경 설정456
+# 환경 설정123
 ENVIRONMENT = os.getenv('AIRFLOW_ENV', 'local')  # 기본값은 local
 
 # 환경별 설정
