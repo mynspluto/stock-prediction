@@ -5,7 +5,7 @@ metadata:
   namespace: web
 spec:
   rules:
-    - host: next.com
+    - host: next.mynspluto.local.com
       http:
         paths:
           - path: /
