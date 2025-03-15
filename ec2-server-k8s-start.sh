@@ -1,5 +1,3 @@
-#!/bin/zsh
-
 kubectl create namespace fastapi
 kubectl config set-context --current --namespace=fastapi
 
