@@ -169,13 +169,6 @@ async def predict(ticker: str):
         
         is_intraday = (last_data_date == prediction_date)
         
-        producer.produce(
-            'test_1',
-            key=ticker,
-            value=json.dumps({"test_message": "hi"})
-        )
-        producer.flush()
-        
         # 장중인 경우에만 알림 발생
         if is_intraday:
             price_diff_percent = abs(predicted_close - current_close) / current_close * 100
