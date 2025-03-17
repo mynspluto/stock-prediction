@@ -35,7 +35,7 @@ Airflow, Hadoop, Kafka, Kubernetes(Minikube), Docker, Next, FastAPI
 
 ## 시스템 구성도
 
-![시스템 구성도](./system_diagram1.svg)
+![시스템 구성도](./system_diagram.svg)
 
 ## 마주했던 이슈
 
