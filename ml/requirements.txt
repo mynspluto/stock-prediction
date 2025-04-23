@@ -1,0 +1,11 @@
+apache-airflow==2.10.4
+apache-airflow-providers-apache-kafka
+apache-airflow-providers-apache-hdfs
+hdfs[avro,dataframe,kerberos]
+pandas
+confluent-kafka
+asgiref
+requests
+pendulum
+yfinance
+scikit-learn
