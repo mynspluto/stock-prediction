@@ -9,3 +9,5 @@ requests
 pendulum
 yfinance
 scikit-learn
+tensorflow
+matplotlib
