@@ -169,3 +169,12 @@ X_future = np.reshape(X_future, (X_future.shape[0], X_future.shape[1], 1))
 future_price = model.predict(X_future)
 future_price = scaler.inverse_transform(future_price)
 print(f'다음 거래일 예상 주가: {future_price[0][0]}')
+
+#data = fetchData('IXIC')
+#data = addCharacter(data) 특성 추가
+#data = adjust(data) 차분 등 계절성 데이터 조정, 정규화 등 모델에 맞게 조정
+#saveData(data)
+#data = loadData('IXIC')
+#[x_train, y_train, x_text, y_test] = split()
+#model = train(data)
+#evaluate(model, data)
