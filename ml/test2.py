@@ -585,130 +585,384 @@ def predict_future(model, last_data, feature_cols, scaler_dict, days=30, freq='B
 
 def add_seasonality_features(data):
     """
-    Add seasonality features to the dataframe.
+    데이터프레임에 표준 달력 기반 계절성 특성을 추가합니다.
     
     Parameters:
-    data (pd.DataFrame): DataFrame with datetime index
+    data (pd.DataFrame): 날짜 인덱스가 있는 DataFrame
     
     Returns:
-    pd.DataFrame: DataFrame with added seasonality features
+    pd.DataFrame: 계절성 특성이 추가된 DataFrame
     """
-    # Make a copy to avoid warnings
+    # 경고를 피하기 위해 복사
     data = data.copy()
     
-    # Extract datetime components
-    data['day_of_week'] = data.index.dayofweek  # Monday=0, Sunday=6
-    data['day_of_month'] = data.index.day
-    data['week_of_year'] = data.index.isocalendar().week
+    # 날짜 구성요소 추출
+    data['day_of_week'] = data.index.dayofweek  # 월요일=0, 일요일=6
     data['month'] = data.index.month
     data['quarter'] = data.index.quarter
+    data['year'] = data.index.year
     
-    # Cyclic encoding for day of week (transforms categorical variables to continuous)
+    # 사이클릭 인코딩 적용
+    # 요일에 대한 사이클릭 인코딩
     data['day_of_week_sin'] = np.sin(2 * np.pi * data['day_of_week'] / 7)
     data['day_of_week_cos'] = np.cos(2 * np.pi * data['day_of_week'] / 7)
     
-    # Cyclic encoding for month
+    # 월에 대한 사이클릭 인코딩
     data['month_sin'] = np.sin(2 * np.pi * data['month'] / 12)
     data['month_cos'] = np.cos(2 * np.pi * data['month'] / 12)
     
-    # Cyclic encoding for quarter
+    # 분기에 대한 사이클릭 인코딩
     data['quarter_sin'] = np.sin(2 * np.pi * data['quarter'] / 4)
     data['quarter_cos'] = np.cos(2 * np.pi * data['quarter'] / 4)
     
-    # Identify special calendar events
-    # End of month
-    data['is_month_end'] = (data.index.is_month_end).astype(int)
+    # 연도 특성 (연도 간 변화 캡처)
+    # 기준 연도 대비 상대적 연도 (최근 연도일수록 값이 큼)
+    min_year = data['year'].min()
+    data['rel_year'] = data['year'] - min_year
     
-    # End of quarter
-    data['is_quarter_end'] = (data.index.is_quarter_end).astype(int)
+    # 원래 범주형 열 삭제
+    data = data.drop(['day_of_week', 'month', 'quarter', 'year'], axis=1)
     
-    # End of year
-    data['is_year_end'] = (data.index.is_year_end).astype(int)
+    return data
+
+def add_trading_calendar_features(data):
+    """
+    거래일 기반 계절성 특성을 추가합니다.
+    휴장일을 고려하여 더 정확한 계절성 특성을 생성합니다.
     
-    # Drop the original categorical columns
-    data = data.drop(['day_of_week', 'month', 'quarter'], axis=1)
+    Parameters:
+    data (pd.DataFrame): 날짜 인덱스가 있는 DataFrame
+    
+    Returns:
+    pd.DataFrame: 거래일 기반 계절성 특성이 추가된 DataFrame
+    """
+    # 경고를 피하기 위해 복사
+    data = data.copy()
+    
+    try:
+        # 거래일 관련 특성 추가
+        # 각 날짜의 연중 거래일 번호 계산
+        data['trading_day_of_year'] = data.groupby(data.index.year).cumcount() + 1
+        
+        # 연간 총 거래일 수 계산
+        yearly_trading_days = data.groupby(data.index.year).size()
+        # 각 연도의 총 거래일 수를 데이터에 매핑
+        data['total_trading_days_in_year'] = data.index.year.map(yearly_trading_days)
+        
+        # 정규화된 연중 거래일 위치 계산 (0~1 사이 값)
+        data['norm_trading_day_of_year'] = data['trading_day_of_year'] / data['total_trading_days_in_year']
+        
+        # 거래일 기반 사이클릭 인코딩
+        data['trading_day_sin'] = np.sin(2 * np.pi * data['norm_trading_day_of_year'])
+        data['trading_day_cos'] = np.cos(2 * np.pi * data['norm_trading_day_of_year'])
+        
+        # 간단한 거래일 특성만 유지
+        data = data.drop(['trading_day_of_year', 'total_trading_days_in_year', 'norm_trading_day_of_year'], axis=1)
+        
+    except Exception as e:
+        print(f"거래일 특성 생성 중 오류 발생: {e}")
+        print("일부 거래일 특성을 건너뛰고 계속 진행합니다.")
     
     return data
 
 # Add this function to analyze and detect seasonality
 def analyze_seasonality(data, column='Close', plot=True, save_path=None):
     """
-    Analyze the seasonality in time series data.
+    시계열 데이터의 계절성을 분석합니다.
     
     Parameters:
-    data (pd.DataFrame): Time series data with datetime index
-    column (str): Column to analyze for seasonality
-    plot (bool): Whether to plot the seasonal decomposition
-    save_path (str, optional): Path to save the plots
+    data (pd.DataFrame): 날짜 인덱스가 있는 시계열 데이터
+    column (str): 계절성을 분석할 열
+    plot (bool): 계절성 분해를 시각화할지 여부
+    save_path (str, optional): 그래프 저장 경로
     
     Returns:
-    dict: Seasonality analysis results
+    dict: 계절성 분석 결과
     """
     from statsmodels.tsa.seasonal import seasonal_decompose
+    import pandas as pd
     
-    # Get the frequency of the data
+    # 데이터 빈도 가져오기
     if data.index.inferred_freq is None:
-        # Try to infer the frequency
-        data = data.asfreq('B')  # Business day frequency
+        # 빈도 추론 시도
+        data = data.asfreq('B')  # 영업일 빈도
     
-    # Perform seasonal decomposition
+    # 계절성 분해 수행
     try:
-        result = seasonal_decompose(data[column], model='additive', period=252)  # 252 trading days in a year
+        # 연간 계절성 (252 영업일)
+        result_annual = seasonal_decompose(data[column], model='additive', period=252)  
+        
+        # 분기 계절성 (63 영업일)
+        result_quarterly = seasonal_decompose(data[column], model='additive', period=63)
+        
+        # 월간 계절성 (21 영업일)
+        result_monthly = seasonal_decompose(data[column], model='additive', period=21)
+        
+        # 주간 계절성 (5 영업일)
+        result_weekly = seasonal_decompose(data[column], model='additive', period=5)
         
         if plot:
+            # 연간 계절성 분해 시각화
             fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(14, 10))
-            result.observed.plot(ax=ax1)
-            ax1.set_title('Observed')
-            result.trend.plot(ax=ax2)
-            ax2.set_title('Trend')
-            result.seasonal.plot(ax=ax3)
-            ax3.set_title('Seasonal')
-            result.resid.plot(ax=ax4)
-            ax4.set_title('Residual')
+            result_annual.observed.plot(ax=ax1)
+            ax1.set_title('관측값')
+            result_annual.trend.plot(ax=ax2)
+            ax2.set_title('추세')
+            result_annual.seasonal.plot(ax=ax3)
+            ax3.set_title('계절성 (연간)')
+            result_annual.resid.plot(ax=ax4)
+            ax4.set_title('잔차')
             plt.tight_layout()
             
             if save_path:
-                plt.savefig(f"{save_path}/seasonal_decomposition.png")
+                plt.savefig(f"{save_path}/annual_seasonal_decomposition.png")
+                plt.close()
+            
+            # 각 계절성 구성요소 비교
+            fig, axes = plt.subplots(3, 1, figsize=(14, 10))
+            
+            # 연간/분기/월간 계절성 패턴 비교
+            result_annual.seasonal.iloc[-252:].plot(ax=axes[0], label='연간 계절성')
+            result_quarterly.seasonal.iloc[-252:].plot(ax=axes[0], label='분기 계절성')
+            result_monthly.seasonal.iloc[-252:].plot(ax=axes[0], label='월간 계절성')
+            axes[0].set_title('다양한 계절성 패턴 비교')
+            axes[0].legend()
+            
+            # 월간 평균 수익률 분석 (월별 효과)
+            monthly_returns = data[column].pct_change().groupby(data.index.month).mean() * 100
+            monthly_returns.index = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월']
+            monthly_returns.plot(kind='bar', ax=axes[1])
+            axes[1].set_title('월별 평균 수익률')
+            axes[1].set_ylabel('평균 일일 수익률 (%)')
+            
+            # 요일별 평균 수익률 분석 (요일 효과)
+            daily_returns = data[column].pct_change().groupby(data.index.dayofweek).mean() * 100
+            daily_returns.index = ['월', '화', '수', '목', '금']
+            daily_returns.plot(kind='bar', ax=axes[2])
+            axes[2].set_title('요일별 평균 수익률')
+            axes[2].set_ylabel('평균 일일 수익률 (%)')
+            
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(f"{save_path}/seasonal_patterns_analysis.png")
                 plt.close()
         
-        # Calculate seasonality strength
-        seasonal_variance = np.var(result.seasonal)
-        residual_variance = np.var(result.resid.dropna())
-        trend_variance = np.var(result.trend.dropna())
+        # 계절성 강도 계산
+        seasonal_annual_var = np.var(result_annual.seasonal)
+        seasonal_quarterly_var = np.var(result_quarterly.seasonal)
+        seasonal_monthly_var = np.var(result_monthly.seasonal)
+        seasonal_weekly_var = np.var(result_weekly.seasonal)
         
-        seasonality_strength = seasonal_variance / (seasonal_variance + residual_variance)
-        trend_strength = trend_variance / (trend_variance + residual_variance)
+        residual_var = np.var(result_annual.resid.dropna())
+        trend_var = np.var(result_annual.trend.dropna())
         
+        # 각 주기별 계절성 강도
+        annual_strength = seasonal_annual_var / (seasonal_annual_var + residual_var)
+        quarterly_strength = seasonal_quarterly_var / (seasonal_quarterly_var + residual_var)
+        monthly_strength = seasonal_monthly_var / (seasonal_monthly_var + residual_var)
+        weekly_strength = seasonal_weekly_var / (seasonal_weekly_var + residual_var)
+        trend_strength = trend_var / (trend_var + residual_var)
+        
+        # 월별, 요일별 효과 분석
+        monthly_effect = data[column].pct_change().groupby(data.index.month).mean()
+        day_of_week_effect = data[column].pct_change().groupby(data.index.dayofweek).mean()
+        
+        # 분석 결과
         analysis = {
-            'seasonal_variance': seasonal_variance,
-            'residual_variance': residual_variance,
-            'trend_variance': trend_variance,
-            'seasonality_strength': seasonality_strength,
-            'trend_strength': trend_strength
+            'trend_strength': trend_strength,
+            'annual_seasonality_strength': annual_strength,
+            'quarterly_seasonality_strength': quarterly_strength,
+            'monthly_seasonality_strength': monthly_strength,
+            'weekly_seasonality_strength': weekly_strength,
+            'monthly_effect': monthly_effect.to_dict(),
+            'day_of_week_effect': day_of_week_effect.to_dict()
         }
         
-        print(f"Seasonality Strength: {seasonality_strength:.4f}")
-        print(f"Trend Strength: {trend_strength:.4f}")
+        print("\n====== 계절성 분석 결과 ======")
+        print(f"추세 강도: {trend_strength:.4f}")
+        print(f"연간 계절성 강도: {annual_strength:.4f}")
+        print(f"분기 계절성 강도: {quarterly_strength:.4f}")
+        print(f"월간 계절성 강도: {monthly_strength:.4f}")
+        print(f"주간 계절성 강도: {weekly_strength:.4f}")
+        
+        print("\n----- 월별 수익률 효과 -----")
+        for month, effect in monthly_effect.items():
+            month_name = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'][month-1]
+            print(f"{month_name}: {effect*100:.4f}%")
+        
+        print("\n----- 요일별 수익률 효과 -----")
+        for day, effect in day_of_week_effect.items():
+            day_name = ['월요일', '화요일', '수요일', '목요일', '금요일'][day]
+            print(f"{day_name}: {effect*100:.4f}%")
         
         return analysis
     
     except Exception as e:
-        print(f"Error in seasonal decomposition: {e}")
+        print(f"계절성 분해 중 오류 발생: {e}")
         return None
+    
+# evaluate_feature_sets 함수 추가
+def evaluate_feature_sets(data, target_col='Close', seq_length=60, epochs=10):
+    """
+    여러 특성 조합의 성능을 비교합니다.
+    """
+    # 기본 특성 세트
+    base_features = [
+        'Close', 
+        'Open', 
+        'High', 
+        'Low', 
+        'Volume'
+    ]
+    
+    # 기술적 지표
+    technical_features = [
+        'SMA_5', 
+        'SMA_20', 
+        'SMA_60', 
+        'RSI', 
+        'MACD', 
+        'Price_Change', 
+        'HL_Ratio'
+    ]
+    
+    # 계절성 특성
+    seasonality_features = [
+        # add_seasonality_features 함수에서 추가되는 특성
+        'day_of_week_sin',   # 요일 사인 변환
+        'day_of_week_cos',   # 요일 코사인 변환
+        'month_sin',         # 월 사인 변환
+        'month_cos',         # 월 코사인 변환
+        'quarter_sin',       # 분기 사인 변환
+        'quarter_cos',       # 분기 코사인 변환
+        'rel_year',          # 상대적 연도
+        
+        # add_trading_calendar_features 함수에서 추가되는 특성
+        'trading_day_sin',               # 연중 거래일 사인 변환
+        'trading_day_cos',               # 연중 거래일 코사인 변환
+    ]
+    
+    # 특성 조합 정의
+    feature_sets = {
+        "기본 특성만": base_features,
+        "기본 + 기술적 지표": base_features + technical_features,
+        "기본 + 계절성": base_features + seasonality_features,
+        "모든 특성": base_features + technical_features + seasonality_features
+    }
+    
+    results = {}
+    
+    # 각 특성 조합 평가
+    for name, feature_set in feature_sets.items():
+        # 해당 특성이 데이터에 있는지 확인
+        valid_features = [f for f in feature_set if f in data.columns]
+        
+        if len(valid_features) < 2:  # 최소 2개 이상의 유효한 특성 필요
+            print(f"{name}: 유효한 특성이 부족합니다.")
+            continue
+            
+        print(f"\n{name} 평가 중...")
+        print(f"사용 특성: {valid_features}")
+        
+        # 5번 반복 평가
+        mapes = []
+        for i in range(5):
+            # 간소화된 워크포워드 검증
+            end_idx = len(data) - 30  # 마지막 30일은 테스트용
+            start_idx = end_idx - 300 - seq_length  # 300일 학습 + 시퀀스 길이
+            
+            # 학습/테스트 데이터 분할
+            train_data = data.iloc[start_idx:end_idx]
+            test_data = data.iloc[end_idx:end_idx+30]
+            
+            # 데이터 정규화 및 시퀀스 생성
+            scaler_dict = {}
+            scaled_train = pd.DataFrame(index=train_data.index)
+            scaled_test = pd.DataFrame(index=test_data.index)
+            
+            for col in valid_features + [target_col]:
+                scaler = MinMaxScaler(feature_range=(0, 1))
+                scaled_train[col] = scaler.fit_transform(train_data[[col]])
+                scaled_test[col] = scaler.transform(test_data[[col]])
+                scaler_dict[col] = scaler
+            
+            # 시퀀스 생성
+            X_train, y_train = create_multivariate_sequences(
+                scaled_train, valid_features, target_col, seq_length
+            )
+            
+            # 모델 생성 및 학습
+            model = build_lstm_model(seq_length, n_features=len(valid_features))
+            model.fit(
+                X_train, y_train,
+                epochs=epochs,
+                batch_size=32,
+                verbose=0
+            )
+            
+            # 테스트 예측
+            test_seq = scaled_train[valid_features].iloc[-seq_length:].values
+            test_seq = test_seq.reshape(1, seq_length, len(valid_features))
+            
+            preds = []
+            actual = scaled_test[target_col].values
+            
+            for j in range(len(actual)):
+                pred = model.predict(test_seq, verbose=0)[0, 0]
+                preds.append(pred)
+                
+                if j < len(actual) - 1:
+                    test_seq = np.roll(test_seq, -1, axis=1)
+                    next_features = scaled_test[valid_features].iloc[j+1].values
+                    test_seq[0, -1, :] = next_features
+            
+            # MAPE 계산
+            y_true = scaler_dict[target_col].inverse_transform(actual.reshape(-1, 1))
+            y_pred = scaler_dict[target_col].inverse_transform(np.array(preds).reshape(-1, 1))
+            mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+            mapes.append(mape)
+        
+        # 평균 MAPE 계산
+        avg_mape = np.mean(mapes)
+        results[name] = avg_mape
+        print(f"{name} 평균 MAPE: {avg_mape:.2f}%")
+    
+    # 결과 요약
+    print("\n=== 특성 조합별 성능 비교 ===")
+    for name, mape in sorted(results.items(), key=lambda x: x[1]):
+        print(f"{name}: MAPE {mape:.2f}%")
+    
+    # 시각화
+    plt.figure(figsize=(10, 6))
+    names = []
+    mapes = []
+    for name, mape in sorted(results.items(), key=lambda x: x[1]):
+        names.append(name)
+        mapes.append(mape)
+    
+    plt.barh(names, mapes)
+    plt.xlabel('MAPE (%)')
+    plt.title('특성 조합별 성능 비교')
+    plt.tight_layout()
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
+    plt.show()
+        
+    return results
 
 # 9. 메인 로직
 def main():
     # 설정
-    ticker = 'QQQ'
-    start_date = '2020-01-01'
-    end_date = '2023-01-01'
+    ticker = '^IXIC'
+    start_date = '2010-01-01'
+    end_date = '2020-01-01'
     target_col = 'Close'
-    seq_length = 60
+    seq_length = 120
     
     # 학습 및 예측 기간 설정 (일 단위)
     train_days = 300  # 학습 기간 (최소 seq_length의 2배 이상)
-    pred_days = 30    # 예측 기간 (약 1개월)
-    step_days = 30    # 워크포워드 이동 간격
+    pred_days = 60    # 예측 기간 (약 1개월)
+    step_days = 60    # 워크포워드 이동 간격
     
     # 그래프 저장 설정
     save_graphs = False
@@ -722,7 +976,7 @@ def main():
     data = fetchData(ticker, start_date, end_date)
     print('데이터 가져오기 완료:\n', data.head())
     
-    # 2. 특성 추가
+    # 2. 기술적 지표 추가
     data = addSMA(data)
     data = addMACD(data)
     data = calculateRSI(data)
@@ -736,119 +990,48 @@ def main():
     # 추가 특성: 고가-저가 비율
     data['HL_Ratio'] = (data['High'] - data['Low']) / data['Close'] * 100
     
-    # 계절성 분석 및 특성 추가
-    seasonality_analysis = analyze_seasonality(data, column='Close', plot=True, save_path=save_path)
-    data = add_seasonality_features(data)
-    
-    # 결측치 제거
+    # 결측치 제거 - 계절성 분석 전에 수행
     data.dropna(inplace=True)
+    
+    # 계절성 분석 시도 - 실패해도 계속 진행
+    try:
+        seasonality_analysis = analyze_seasonality(data, column='Close', plot=True, save_path=save_path)
+    except Exception as e:
+        print(f"계절성 분석 중 오류 발생: {e}")
+        print("계절성 분석을 건너뛰고 계속 진행합니다.")
+        seasonality_analysis = None
+    
+    # 계절성 특성 추가 - 실패해도 계속 진행
+    data_with_seasonality = None
+    try:
+        # 표준 계절성 특성 추가
+        data_with_seasonality = add_seasonality_features(data.copy())
+        print("표준 계절성 특성 추가 완료")
+    except Exception as e:
+        print(f"표준 계절성 특성 추가 중 오류 발생: {e}")
+        print("표준 계절성 특성을 건너뛰고 계속 진행합니다.")
+        data_with_seasonality = data.copy()  # 원본 데이터 유지
+    
+    # 거래일 기반 계절성 특성 추가 - 실패해도 계속 진행
+    try:
+        if data_with_seasonality is not None:
+            data_with_seasonality = add_trading_calendar_features(data_with_seasonality)
+            data = data_with_seasonality  # 성공하면 결과를 원본 데이터에 반영
+            print("거래일 기반 계절성 특성 추가 완료")
+    except Exception as e:
+        print(f"거래일 기반 계절성 특성 추가 중 오류 발생: {e}")
+        print("거래일 기반 계절성 특성을 건너뛰고 계속 진행합니다.")
     
     print('\n특성 추가 완료:')
     print(data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'RSI']].tail())
     
     # 3. 데이터 시각화
-    plotChart(data, ['Close', 'SMA_20', 'SMA_60'], f'{ticker} Stock Price', save_path)
-    
-    # 사용할 특성 정의
-    feature_cols = [
-        'Close',       # 종가
-        'Open',        # 시가
-        'High',        # 고가
-        'Low',         # 저가
-        'Volume'
-        # 'log_Volume',  # 거래량 (로그 변환)
-        # 'SMA_5',       # 5일 이동평균
-        # 'SMA_20',      # 20일 이동평균
-        # 'RSI',         # RSI
-        # 'MACD',        # MACD
-        # 'Price_Change',# 가격 변화율
-        # 'HL_Ratio'     # 고가-저가 비율
-    ]
-    
-    # 4. 워크포워드 검증 수행
-    # 시작 인덱스를 조정하여 충분한 데이터가 있도록 함
-    min_start_idx = seq_length + train_days  # 충분한 학습 데이터 확보
-    
-    models, predictions, actuals, evaluation, scaler_dict = walk_forward_validation(
-        data, feature_cols, target_col, seq_length, train_days, pred_days, step_days,
-        start_idx=min_start_idx, epochs=20, batch_size=32, save_path=save_path
-    )
-    
-    # 5. 예측 결과 개별 시각화
-    plot_prediction_results(data, target_col, predictions, actuals, evaluation, scaler_dict, save_path)
-    
-    # 6. 최신 모델로 미래 예측
-    if models:
-        latest_model = models[-1]
+    plotChart(data, ['Close', 'SMA_20', 'SMA_60'], f'{ticker} Stock Price', save_path) 
         
-        # 미래 예측
-        future_days = 30
-        future_predictions = predict_future(
-            latest_model, data, feature_cols, scaler_dict, days=future_days
-        )
-        
-        if future_predictions is not None:
-            # 미래 날짜 생성
-            last_date = data.index[-1]
-            future_dates = pd.date_range(
-                start=last_date + timedelta(days=1),
-                periods=future_days,
-                freq='B'  # 영업일 기준
-            )
-            
-            # 미래 예측 시각화
-            plt.figure(figsize=(14, 7))
-            plt.plot(data[target_col][-90:].index, data[target_col][-90:], 'b-', label='Historical Data')
-            plt.plot(future_dates, future_predictions, 'r--', label='Future Predictions')
-            plt.title(f'{ticker} Future Price Prediction')
-            plt.xlabel('Date')
-            plt.ylabel('Price')
-            plt.legend()
-            plt.grid(True)
-            
-            if save_path:
-                plt.savefig(f"{save_path}/future_prediction.png")
-                plt.close()
-            # else:
-            #     plt.show()
-            
-            print("\n미래 예측 결과:")
-            for date, price in zip(future_dates[:10], future_predictions[:10]):
-                print(f"{date.strftime('%Y-%m-%d')}: {price[0]:.2f}")
-            
-            # 성능 평가 요약
-            print("\n워크포워드 검증 성능 요약:")
-            if evaluation:
-                avg_mape = np.mean([eval_info['mape'] for eval_info in evaluation])
-                print(f"평균 MAPE: {avg_mape:.2f}%")
-                
-                # 베스트 모델 찾기
-                best_model_idx = np.argmin([eval_info['mape'] for eval_info in evaluation])
-                print(f"베스트 모델 인덱스: {best_model_idx}")
-                print(f"베스트 모델 MAPE: {evaluation[best_model_idx]['mape']:.2f}%")
-                
-                # 성능 변화 시각화
-                plt.figure(figsize=(10, 6))
-                plt.plot([i for i in range(len(evaluation))], 
-                        [eval_info['mape'] for eval_info in evaluation], 'o-')
-                plt.title('MAPE by Walk-Forward Iteration')
-                plt.xlabel('Iteration')
-                plt.ylabel('MAPE (%)')
-                plt.grid(True)
-                
-                if save_path:
-                    plt.savefig(f"{save_path}/mape_by_iteration.png")
-                    plt.close()
-                # else:
-                #     plt.show()
-    else:
-        print("미래 예측을 위한 모델이 없습니다.")
+    # 4. 특성 평가 수행
+    print("\n다양한 특성 조합에 대한 평가를 시작합니다...")
+    feature_evaluation = evaluate_feature_sets(data, target_col=target_col, seq_length=seq_length, epochs=5)
     
-    # 사용자에게 그래프 확인 안내
-    if not save_path:
-        input("\n모든 처리가 완료되었습니다. 그래프를 모두 확인한 후 Enter 키를 눌러 프로그램을 종료하세요.")
-
-# 메인 함수 실행
 if __name__ == "__main__":
   main()
   
