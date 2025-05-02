@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -78,7 +77,36 @@ def addMACD(data, fast=12, slow=26, signal=9):
     
     return data
 
-def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None):
+def calculateRSI(data, window=14, column='Close'):
+    """
+    상대강도지수(RSI)를 계산합니다.
+    
+    Parameters:
+    data (pd.DataFrame): 주가 데이터
+    window (int): RSI 계산 기간
+    column (str): RSI를 계산할 열 이름
+    
+    Returns:
+    pd.DataFrame: RSI 지표가 추가된 데이터
+    """
+    # 가격 변화 계산
+    delta = data[column].diff()
+    
+    # 상승/하락 분리
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    
+    # 평균 상승/하락 계산
+    avg_gain = gain.rolling(window=window).mean()
+    avg_loss = loss.rolling(window=window).mean()
+    
+    # RS 및 RSI 계산
+    rs = avg_gain / avg_loss
+    data['RSI'] = 100 - (100 / (1 + rs))
+    
+    return data
+
+def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None, save_path=None):
     """
     주가 데이터와 지표를 시각화합니다.
     
@@ -86,6 +114,7 @@ def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None):
     data (pd.DataFrame): 주가 데이터
     columns (list): 시각화할 열 이름 리스트
     title (str, optional): 차트 제목
+    save_path (str, optional): 저장 경로
     """
     plt.figure(figsize=(14, 7))
     for col in columns:
@@ -97,7 +126,13 @@ def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None):
     plt.ylabel('Price')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path)
+        plt.close()
+    # else:
+    #     plt.show()
     
     # MACD 차트 (MACD가 있는 경우)
     if 'MACD' in data.columns and 'Signal' in data.columns:
@@ -110,7 +145,13 @@ def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None):
         plt.ylabel('Value')
         plt.legend()
         plt.grid(True)
-        plt.show()
+        
+        if save_path:
+            macd_path = save_path.replace('.png', '_macd.png')
+            plt.savefig(macd_path)
+            plt.close()
+        # else:
+        #     plt.show()
 
 # 3. 데이터 저장 및 로드 함수
 def saveData(data, filename):
@@ -141,13 +182,42 @@ def loadData(filename):
     print(f"데이터 로드 완료: data/{filename}.csv")
     return data
 
-# 4. LSTM 모델 생성 함수
-def build_lstm_model(seq_length, layers=[50, 50], dropouts=[0.2, 0.2]):
+# 4. 다변량 시퀀스 생성 함수
+def create_multivariate_sequences(data, feature_cols, target_col, seq_length=60):
+    """
+    다변량 시계열 데이터를 시퀀스 형태로 변환합니다.
+    
+    Parameters:
+    data (pd.DataFrame): 시퀀스로 변환할 데이터
+    feature_cols (list): 입력 특성 열 이름 리스트
+    target_col (str): 대상 열 이름
+    seq_length (int): 시퀀스 길이
+    
+    Returns:
+    tuple: (X 시퀀스, y 타겟값)
+    """
+    X, y = [], []
+    
+    for i in range(len(data) - seq_length):
+        # 다변량 특성 시퀀스
+        features_seq = data[feature_cols].iloc[i:i + seq_length].values
+        
+        # 타겟 값 (다음 종가)
+        target = data[target_col].iloc[i + seq_length]
+        
+        X.append(features_seq)
+        y.append(target)
+    
+    return np.array(X), np.array(y)
+
+# 5. LSTM 모델 생성 함수
+def build_lstm_model(seq_length, n_features=1, layers=[50, 50], dropouts=[0.2, 0.2]):
     """
     LSTM 모델을 생성합니다.
     
     Parameters:
     seq_length (int): 시퀀스 길이
+    n_features (int): 입력 특성 수
     layers (list): LSTM 레이어별 유닛 수
     dropouts (list): LSTM 레이어별 드롭아웃 비율
     
@@ -156,10 +226,10 @@ def build_lstm_model(seq_length, layers=[50, 50], dropouts=[0.2, 0.2]):
     """
     model = Sequential()
     
-    # 첫 번째 레이어
+    # 첫 번째 레이어 (다변량 입력 지원)
     model.add(LSTM(units=layers[0], 
                   return_sequences=(len(layers) > 1),
-                  input_shape=(seq_length, 1)))
+                  input_shape=(seq_length, n_features)))
     model.add(Dropout(dropouts[0]))
     
     # 중간 레이어
@@ -181,15 +251,17 @@ def build_lstm_model(seq_length, layers=[50, 50], dropouts=[0.2, 0.2]):
     
     return model
 
-# 5. 워크포워드 검증 함수 (수정된 버전)
-def walk_forward_validation(data, target_col='Close', seq_length=60, 
-                           train_days=252*3, pred_days=21, step_days=21,
-                           start_idx=None, end_idx=None, epochs=20, batch_size=32):
+# 6. 워크포워드 검증 함수 (다변량 버전)
+def walk_forward_validation(data, feature_cols, target_col='Close', seq_length=60, 
+                           train_days=252, pred_days=21, step_days=21,
+                           start_idx=None, end_idx=None, epochs=20, batch_size=32, 
+                           save_path=None):
     """
-    워크포워드 방식으로 주가 예측을 수행합니다.
+    워크포워드 방식으로 주가 예측을 수행합니다 (다변량 입력 지원).
     
     Parameters:
     data (pd.DataFrame): 전체 시계열 데이터
+    feature_cols (list): 입력 특성 열 이름 리스트
     target_col (str): 대상 열 이름
     seq_length (int): 시퀀스 길이
     train_days (int): 학습에 사용할 일수
@@ -199,13 +271,23 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
     end_idx (int, optional): 종료 인덱스
     epochs (int): 학습 에포크 수
     batch_size (int): 배치 크기
+    save_path (str, optional): 그래프 저장 경로
     
     Returns:
-    tuple: (모델 리스트, 예측 결과, 실제 값, 평가 결과)
+    tuple: (모델 리스트, 예측 결과, 실제 값, 평가 결과, 스케일러 딕셔너리)
     """
     # 데이터 정규화
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_data = scaler.fit_transform(data[[target_col]])
+    scaler_dict = {}
+    scaled_data = pd.DataFrame(index=data.index)
+    
+    # 각 특성별로 개별 스케일러 사용
+    for col in feature_cols + [target_col]:
+        if col not in data.columns:
+            continue
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled_values = scaler.fit_transform(data[[col]])
+        scaled_data[col] = scaled_values
+        scaler_dict[col] = scaler
     
     # 인덱스 설정
     if start_idx is None:
@@ -236,33 +318,18 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
         print(f"예측: {data.index[test_start].strftime('%Y-%m-%d')} ~ {data.index[min(test_end-1, len(data)-1)].strftime('%Y-%m-%d')}")
         
         # 학습 데이터 준비
-        train_data = scaled_data[train_start:train_end]
+        train_data = scaled_data.iloc[train_start:train_end]
         
-        # 시퀀스 생성
-        X_train, y_train = [], []
-        for j in range(len(train_data) - seq_length):
-            X_train.append(train_data[j:j + seq_length])
-            y_train.append(train_data[j + seq_length])
+        # 다변량 시퀀스 생성
+        X_train, y_train = create_multivariate_sequences(train_data, feature_cols, target_col, seq_length)
         
         # 충분한 데이터가 없는 경우 건너뜀
         if len(X_train) < 10:  # 최소 10개의 시퀀스가 필요하다고 가정
             print(f"경고: 충분한 학습 데이터가 없습니다. 시퀀스 수: {len(X_train)}")
             continue
         
-        # 배열로 변환
-        X_train = np.array(X_train)
-        y_train = np.array(y_train)
-        
-        # 테스트 데이터 생성 (마지막 시퀀스 + 실제 타겟값)
-        X_test = scaled_data[train_end - seq_length:train_end]
-        X_test = X_test.reshape(1, seq_length, 1)
-        y_test = scaled_data[test_start:test_end]
-        
         # 모델 생성 및 학습
-        model = build_lstm_model(seq_length)
-        
-        # 학습 데이터 형태 조정
-        X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
+        model = build_lstm_model(seq_length, n_features=len(feature_cols))
         
         # 학습
         history = model.fit(
@@ -272,29 +339,43 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
             verbose=1
         )
         
-        # 예측 수행
-        test_predictions = []
-        current_batch = X_test.copy()
+        # 예측 수행 (롤링 방식)
+        test_sequence = scaled_data.iloc[train_end - seq_length:train_end][feature_cols].values
+        test_sequence = test_sequence.reshape(1, seq_length, len(feature_cols))
         
-        for j in range(len(y_test)):
+        test_predictions = []
+        actual_values = scaled_data.iloc[test_start:test_end][target_col].values
+        
+        for j in range(len(actual_values)):
             # 다음 값 예측
-            current_pred = model.predict(current_batch, verbose=0)[0]
-            test_predictions.append(current_pred[0])
+            current_pred = model.predict(test_sequence, verbose=0)[0, 0]
+            test_predictions.append(current_pred)
             
-            # 입력 시퀀스 업데이트 (가장 오래된 값 제거하고 예측값 추가)
-            if j < len(y_test) - 1:  # 마지막 예측이 아니면 시퀀스 업데이트
-                current_batch = np.roll(current_batch, -1, axis=1)
-                current_batch[0, -1, 0] = current_pred[0]
+            # 예측 다음 기간의 실제 다변량 데이터가 있는 경우에만 업데이트
+            if j < len(actual_values) - 1:
+                # 시퀀스를 한 칸씩 밀고 새 값으로 업데이트
+                test_sequence = np.roll(test_sequence, -1, axis=1)
+                
+                # 다음 기간의 실제 다변량 데이터
+                next_features = scaled_data.iloc[test_start + j + 1][feature_cols].values
+                
+                # 마지막 위치에 새 데이터 업데이트
+                test_sequence[0, -1, :] = next_features
         
         # 결과 저장
         models.append(model)
         predictions.append(np.array(test_predictions).reshape(-1, 1))
-        actuals.append(y_test)
+        actuals.append(actual_values.reshape(-1, 1))
         
         # 평가
-        mse = mean_squared_error(y_test, test_predictions)
+        mse = mean_squared_error(actual_values, test_predictions)
         rmse = math.sqrt(mse)
-        mae = mean_absolute_error(y_test, test_predictions)
+        mae = mean_absolute_error(actual_values, test_predictions)
+        
+        # 원래 스케일로 복원한 값으로 MAPE 계산
+        y_test_inv = scaler_dict[target_col].inverse_transform(actual_values.reshape(-1, 1))
+        y_pred_inv = scaler_dict[target_col].inverse_transform(np.array(test_predictions).reshape(-1, 1))
+        mape = np.mean(np.abs((y_test_inv - y_pred_inv) / y_test_inv)) * 100
         
         evaluation.append({
             'train_start': data.index[train_start],
@@ -303,15 +384,16 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
             'test_end': data.index[min(test_end-1, len(data)-1)],
             'mse': mse,
             'rmse': rmse,
-            'mae': mae
+            'mae': mae,
+            'mape': mape
         })
         
-        print(f"MSE: {mse:.6f}, RMSE: {rmse:.6f}, MAE: {mae:.6f}")
+        print(f"MSE: {mse:.6f}, RMSE: {rmse:.6f}, MAE: {mae:.6f}, MAPE: {mape:.2f}%")
     
     # 예측 결과가 없는 경우
     if not predictions:
         print("경고: 유효한 예측 결과가 없습니다. 파라미터를 조정해 보세요.")
-        return [], [], [], [], scaler
+        return [], [], [], [], scaler_dict
     
     # 전체 예측 결과 시각화
     plt.figure(figsize=(15, 7))
@@ -322,8 +404,9 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
     pred_dates = []
     
     for i, (pred, actual, eval_info) in enumerate(zip(predictions, actuals, evaluation)):
-        pred_inv = scaler.inverse_transform(pred)
-        actual_inv = scaler.inverse_transform(actual)
+        # 원래 스케일로 복원
+        pred_inv = scaler_dict[target_col].inverse_transform(pred)
+        actual_inv = scaler_dict[target_col].inverse_transform(actual)
         
         all_pred.extend(pred_inv.flatten())
         all_actual.extend(actual_inv.flatten())
@@ -346,23 +429,32 @@ def walk_forward_validation(data, target_col='Close', seq_length=60,
     plt.ylabel('Price')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    
+    if save_path:
+        plt.savefig(f"{save_path}/walkforward_results.png")
+        plt.close()
+    # else:
+    #     plt.show()
     
     # 평가 지표 평균 계산
     if evaluation:
         avg_metrics = {
             'mse': np.mean([eval_info['mse'] for eval_info in evaluation]),
             'rmse': np.mean([eval_info['rmse'] for eval_info in evaluation]),
-            'mae': np.mean([eval_info['mae'] for eval_info in evaluation])
+            'mae': np.mean([eval_info['mae'] for eval_info in evaluation]),
+            'mape': np.mean([eval_info['mape'] for eval_info in evaluation])
         }
         print("\n평균 평가 지표:")
         for metric, value in avg_metrics.items():
-            print(f"{metric.upper()}: {value:.6f}")
+            if metric == 'mape':
+                print(f"{metric.upper()}: {value:.2f}%")
+            else:
+                print(f"{metric.upper()}: {value:.6f}")
     
-    return models, predictions, actuals, evaluation, scaler
+    return models, predictions, actuals, evaluation, scaler_dict
 
-# 6. 예측 결과 시각화 함수
-def plot_prediction_results(data, target_col, predictions, actuals, evaluation, scaler):
+# 7. 예측 결과 시각화 함수
+def plot_prediction_results(data, target_col, predictions, actuals, evaluation, scaler_dict, save_path=None):
     """
     워크포워드 방식의 예측 결과를 개별적으로 시각화합니다.
     
@@ -372,7 +464,8 @@ def plot_prediction_results(data, target_col, predictions, actuals, evaluation, 
     predictions (list): 예측 결과 리스트
     actuals (list): 실제 값 리스트
     evaluation (list): 평가 정보 리스트
-    scaler (sklearn.preprocessing.MinMaxScaler): 정규화에 사용한 스케일러
+    scaler_dict (dict): 스케일러 딕셔너리
+    save_path (str, optional): 그래프 저장 경로
     """
     if not predictions:
         print("시각화할 예측 결과가 없습니다.")
@@ -381,8 +474,8 @@ def plot_prediction_results(data, target_col, predictions, actuals, evaluation, 
     # 각 예측 기간별 결과 시각화
     for i, (pred, actual, eval_info) in enumerate(zip(predictions, actuals, evaluation)):
         # 원래 스케일로 복원
-        pred_inv = scaler.inverse_transform(pred)
-        actual_inv = scaler.inverse_transform(actual)
+        pred_inv = scaler_dict[target_col].inverse_transform(pred)
+        actual_inv = scaler_dict[target_col].inverse_transform(actual)
         
         # 날짜 범위 생성
         test_dates = pd.date_range(start=eval_info['test_start'], 
@@ -406,11 +499,11 @@ def plot_prediction_results(data, target_col, predictions, actuals, evaluation, 
         plt.plot(test_dates, pred_inv, 'r-', label='Predicted')
         plt.plot(test_dates, actual_inv, 'b-', label='Actual')
         
-        # 전체 기간 표시를 위한 날짜 범위 설정
         try:
+            # 전체 기간 표시를 위한 날짜 범위 설정
             date_range = pd.date_range(start=eval_info['train_start'] - timedelta(days=10), 
-                                    end=eval_info['test_end'] + timedelta(days=10), 
-                                    freq='B')
+                                      end=eval_info['test_end'] + timedelta(days=10), 
+                                      freq='B')
             data_range = data.loc[date_range[0]:date_range[-1], target_col]
         except:
             pass  # 날짜 범위 오류 시 무시
@@ -422,21 +515,27 @@ def plot_prediction_results(data, target_col, predictions, actuals, evaluation, 
         plt.grid(True)
         
         # 평가 지표 표시
-        plt.figtext(0.15, 0.15, f'MSE: {eval_info["mse"]:.6f}\nRMSE: {eval_info["rmse"]:.6f}\nMAE: {eval_info["mae"]:.6f}', 
+        plt.figtext(0.15, 0.15, f'MSE: {eval_info["mse"]:.6f}\nRMSE: {eval_info["rmse"]:.6f}\nMAE: {eval_info["mae"]:.6f}\nMAPE: {eval_info["mape"]:.2f}%', 
                   bbox=dict(facecolor='white', alpha=0.8))
         
-        plt.show()
+        if save_path:
+            plt.savefig(f"{save_path}/prediction_{i+1}.png")
+            plt.close()
+        # else:
+        #     plt.show()
 
-# 7. 미래 예측 함수
-def predict_future(model, last_sequence, days=30, scaler=None):
+# 8. 미래 예측 함수
+def predict_future(model, last_data, feature_cols, scaler_dict, days=30, freq='B'):
     """
-    학습된 모델을 사용하여 미래 가격을 예측합니다.
+    학습된 모델을 사용하여 미래 가격을 예측합니다 (다변량 입력 지원).
     
     Parameters:
     model (tensorflow.keras.models.Sequential): 학습된 모델
-    last_sequence (numpy.ndarray): 마지막 시퀀스 데이터
+    last_data (pd.DataFrame): 마지막 시퀀스 데이터
+    feature_cols (list): 입력 특성 열 이름 리스트
+    scaler_dict (dict): 스케일러 딕셔너리
     days (int): 예측할 날짜 수
-    scaler (sklearn.preprocessing.MinMaxScaler): 정규화에 사용한 스케일러
+    freq (str): 날짜 빈도 ('B'=영업일, 'D'=달력일)
     
     Returns:
     numpy.ndarray: 예측 결과
@@ -444,12 +543,19 @@ def predict_future(model, last_sequence, days=30, scaler=None):
     if model is None:
         print("모델이 없습니다.")
         return None
-        
+    
+    # 시퀀스 길이 확인
+    seq_length = model.input_shape[1]
+    
+    # 마지막 시퀀스 준비
+    last_sequence = last_data[feature_cols].values[-seq_length:]
+    last_sequence = last_sequence.reshape(1, seq_length, len(feature_cols))
+    
     # 예측 결과 저장용 리스트
     future_predictions = []
     
-    # 초기 시퀀스
-    current_sequence = last_sequence.reshape(1, len(last_sequence), 1)
+    # 마지막 예측에 사용할 시퀀스
+    current_sequence = last_sequence.copy()
     
     # 날짜별 예측
     for _ in range(days):
@@ -459,28 +565,45 @@ def predict_future(model, last_sequence, days=30, scaler=None):
         
         # 시퀀스 업데이트
         current_sequence = np.roll(current_sequence, -1, axis=1)
-        current_sequence[0, -1, 0] = next_pred
+        
+        # 마지막 행 업데이트
+        # 여기서는 단순화를 위해 예측된 종가만 업데이트하고 나머지 특성은 마지막 값 복사
+        new_features = current_sequence[0, -2, :].copy()
+        
+        # 종가 인덱스 찾기
+        close_idx = feature_cols.index('Close') if 'Close' in feature_cols else 0
+        new_features[close_idx] = next_pred
+        
+        # 업데이트된 특성으로 마지막 시퀀스 설정
+        current_sequence[0, -1, :] = new_features
     
-    # 스케일러가 제공된 경우 원래 스케일로 복원
-    if scaler:
-        future_predictions = scaler.inverse_transform(
-            np.array(future_predictions).reshape(-1, 1))
+    # 예측값 역정규화 (종가만)
+    future_pred_scaled = scaler_dict['Close'].inverse_transform(
+        np.array(future_predictions).reshape(-1, 1))
     
-    return future_predictions
+    return future_pred_scaled
 
-# 8. 메인 로직
+# 9. 메인 로직
 def main():
     # 설정
     ticker = 'QQQ'
-    start_date = '2021-01-01'
-    end_date = '2024-01-01'
+    start_date = '2020-01-01'
+    end_date = '2023-01-01'
     target_col = 'Close'
-    seq_length = 60 # 길이만큼의 과거 데이터를 보고 다음 날의 값 예측
+    seq_length = 60
     
     # 학습 및 예측 기간 설정 (일 단위)
-    train_days = 120  # 3년 (약 252 거래일/년)
-    pred_days = 21  # 1개월 (약 21 거래일/월)
-    step_days = 21  # 1개월 단위로 이동
+    train_days = 120  # 학습 기간 (최소 seq_length의 2배 이상)
+    pred_days = 21    # 예측 기간 (약 1개월)
+    step_days = 21    # 워크포워드 이동 간격
+    
+    # 그래프 저장 설정
+    save_graphs = False
+    if save_graphs:
+        save_path = f"results/{ticker}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        os.makedirs(save_path, exist_ok=True)
+    else:
+        save_path = None
     
     # 1. 데이터 가져오기
     data = fetchData(ticker, start_date, end_date)
@@ -489,34 +612,63 @@ def main():
     # 2. 특성 추가
     data = addSMA(data)
     data = addMACD(data)
+    data = calculateRSI(data)
+    
+    # 거래량 로그 변환
+    data['log_Volume'] = np.log(data['Volume'] + 1)  # 0 값 처리를 위해 +1
+    
+    # 가격 변화율 추가
+    data['Price_Change'] = data['Close'].pct_change() * 100
+    
+    # 추가 특성: 고가-저가 비율
+    data['HL_Ratio'] = (data['High'] - data['Low']) / data['Close'] * 100
+    
+    # 결측치 제거
+    data.dropna(inplace=True)
+    
     print('\n특성 추가 완료:')
-    print(data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'Signal']].tail())
+    print(data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'RSI']].tail())
     
     # 3. 데이터 시각화
-    plotChart(data)
+    plotChart(data, ['Close', 'SMA_20', 'SMA_60'], f'{ticker} Stock Price', save_path)
+    
+    # 사용할 특성 정의
+    feature_cols = [
+        'Close',       # 종가
+        'Open',        # 시가
+        'High',        # 고가
+        'Low',         # 저가
+        'Volume'
+        # 'log_Volume',  # 거래량 (로그 변환)
+        # 'SMA_5',       # 5일 이동평균
+        # 'SMA_20',      # 20일 이동평균
+        # 'RSI',         # RSI
+        # 'MACD',        # MACD
+        # 'Price_Change',# 가격 변화율
+        # 'HL_Ratio'     # 고가-저가 비율
+    ]
     
     # 4. 워크포워드 검증 수행
-    # 첫 번째 학습 기간에 최소한 seq_length + 충분한 학습 데이터가 있어야 함
     # 시작 인덱스를 조정하여 충분한 데이터가 있도록 함
-    min_start_idx = seq_length + 500  # 충분한 학습 데이터 확보
+    min_start_idx = seq_length + train_days  # 충분한 학습 데이터 확보
     
-    models, predictions, actuals, evaluation, scaler = walk_forward_validation(
-        data, target_col, seq_length, train_days, pred_days, step_days,
-        start_idx=min_start_idx, epochs=20, batch_size=32
+    models, predictions, actuals, evaluation, scaler_dict = walk_forward_validation(
+        data, feature_cols, target_col, seq_length, train_days, pred_days, step_days,
+        start_idx=min_start_idx, epochs=20, batch_size=32, save_path=save_path
     )
     
     # 5. 예측 결과 개별 시각화
-    plot_prediction_results(data, target_col, predictions, actuals, evaluation, scaler)
+    plot_prediction_results(data, target_col, predictions, actuals, evaluation, scaler_dict, save_path)
     
     # 6. 최신 모델로 미래 예측
     if models:
         latest_model = models[-1]
-        last_sequence = data[target_col].values[-seq_length:].reshape(-1, 1)
-        last_sequence = scaler.transform(last_sequence)
         
+        # 미래 예측
         future_days = 30
         future_predictions = predict_future(
-            latest_model, last_sequence.flatten(), days=future_days, scaler=scaler)
+            latest_model, data, feature_cols, scaler_dict, days=future_days
+        )
         
         if future_predictions is not None:
             # 미래 날짜 생성
@@ -536,14 +688,55 @@ def main():
             plt.ylabel('Price')
             plt.legend()
             plt.grid(True)
-            plt.show()
+            
+            if save_path:
+                plt.savefig(f"{save_path}/future_prediction.png")
+                plt.close()
+            # else:
+            #     plt.show()
             
             print("\n미래 예측 결과:")
             for date, price in zip(future_dates[:10], future_predictions[:10]):
                 print(f"{date.strftime('%Y-%m-%d')}: {price[0]:.2f}")
+            
+            # 성능 평가 요약
+            print("\n워크포워드 검증 성능 요약:")
+            if evaluation:
+                avg_mape = np.mean([eval_info['mape'] for eval_info in evaluation])
+                print(f"평균 MAPE: {avg_mape:.2f}%")
+                
+                # 베스트 모델 찾기
+                best_model_idx = np.argmin([eval_info['mape'] for eval_info in evaluation])
+                print(f"베스트 모델 인덱스: {best_model_idx}")
+                print(f"베스트 모델 MAPE: {evaluation[best_model_idx]['mape']:.2f}%")
+                
+                # 성능 변화 시각화
+                plt.figure(figsize=(10, 6))
+                plt.plot([i for i in range(len(evaluation))], 
+                        [eval_info['mape'] for eval_info in evaluation], 'o-')
+                plt.title('MAPE by Walk-Forward Iteration')
+                plt.xlabel('Iteration')
+                plt.ylabel('MAPE (%)')
+                plt.grid(True)
+                
+                if save_path:
+                    plt.savefig(f"{save_path}/mape_by_iteration.png")
+                    plt.close()
+                # else:
+                #     plt.show()
     else:
         print("미래 예측을 위한 모델이 없습니다.")
+    
+    # 사용자에게 그래프 확인 안내
+    if not save_path:
+        input("\n모든 처리가 완료되었습니다. 그래프를 모두 확인한 후 Enter 키를 눌러 프로그램을 종료하세요.")
 
 # 메인 함수 실행
 if __name__ == "__main__":
-    main()
+  main()
+  
+# cd ml
+# python -m venv venv
+# .\venv\Scripts\Activate.ps1
+# pip install -r requirements.txt
+# python test2.py
