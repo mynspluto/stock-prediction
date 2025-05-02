@@ -583,6 +583,119 @@ def predict_future(model, last_data, feature_cols, scaler_dict, days=30, freq='B
     
     return future_pred_scaled
 
+def add_seasonality_features(data):
+    """
+    Add seasonality features to the dataframe.
+    
+    Parameters:
+    data (pd.DataFrame): DataFrame with datetime index
+    
+    Returns:
+    pd.DataFrame: DataFrame with added seasonality features
+    """
+    # Make a copy to avoid warnings
+    data = data.copy()
+    
+    # Extract datetime components
+    data['day_of_week'] = data.index.dayofweek  # Monday=0, Sunday=6
+    data['day_of_month'] = data.index.day
+    data['week_of_year'] = data.index.isocalendar().week
+    data['month'] = data.index.month
+    data['quarter'] = data.index.quarter
+    
+    # Cyclic encoding for day of week (transforms categorical variables to continuous)
+    data['day_of_week_sin'] = np.sin(2 * np.pi * data['day_of_week'] / 7)
+    data['day_of_week_cos'] = np.cos(2 * np.pi * data['day_of_week'] / 7)
+    
+    # Cyclic encoding for month
+    data['month_sin'] = np.sin(2 * np.pi * data['month'] / 12)
+    data['month_cos'] = np.cos(2 * np.pi * data['month'] / 12)
+    
+    # Cyclic encoding for quarter
+    data['quarter_sin'] = np.sin(2 * np.pi * data['quarter'] / 4)
+    data['quarter_cos'] = np.cos(2 * np.pi * data['quarter'] / 4)
+    
+    # Identify special calendar events
+    # End of month
+    data['is_month_end'] = (data.index.is_month_end).astype(int)
+    
+    # End of quarter
+    data['is_quarter_end'] = (data.index.is_quarter_end).astype(int)
+    
+    # End of year
+    data['is_year_end'] = (data.index.is_year_end).astype(int)
+    
+    # Drop the original categorical columns
+    data = data.drop(['day_of_week', 'month', 'quarter'], axis=1)
+    
+    return data
+
+# Add this function to analyze and detect seasonality
+def analyze_seasonality(data, column='Close', plot=True, save_path=None):
+    """
+    Analyze the seasonality in time series data.
+    
+    Parameters:
+    data (pd.DataFrame): Time series data with datetime index
+    column (str): Column to analyze for seasonality
+    plot (bool): Whether to plot the seasonal decomposition
+    save_path (str, optional): Path to save the plots
+    
+    Returns:
+    dict: Seasonality analysis results
+    """
+    from statsmodels.tsa.seasonal import seasonal_decompose
+    
+    # Get the frequency of the data
+    if data.index.inferred_freq is None:
+        # Try to infer the frequency
+        data = data.asfreq('B')  # Business day frequency
+    
+    # Perform seasonal decomposition
+    try:
+        result = seasonal_decompose(data[column], model='additive', period=252)  # 252 trading days in a year
+        
+        if plot:
+            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(14, 10))
+            result.observed.plot(ax=ax1)
+            ax1.set_title('Observed')
+            result.trend.plot(ax=ax2)
+            ax2.set_title('Trend')
+            result.seasonal.plot(ax=ax3)
+            ax3.set_title('Seasonal')
+            result.resid.plot(ax=ax4)
+            ax4.set_title('Residual')
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(f"{save_path}/seasonal_decomposition.png")
+                plt.close()
+        
+        # Calculate seasonality strength
+        seasonal_variance = np.var(result.seasonal)
+        residual_variance = np.var(result.resid.dropna())
+        trend_variance = np.var(result.trend.dropna())
+        
+        seasonality_strength = seasonal_variance / (seasonal_variance + residual_variance)
+        trend_strength = trend_variance / (trend_variance + residual_variance)
+        
+        analysis = {
+            'seasonal_variance': seasonal_variance,
+            'residual_variance': residual_variance,
+            'trend_variance': trend_variance,
+            'seasonality_strength': seasonality_strength,
+            'trend_strength': trend_strength
+        }
+        
+        print(f"Seasonality Strength: {seasonality_strength:.4f}")
+        print(f"Trend Strength: {trend_strength:.4f}")
+        
+        return analysis
+    
+    except Exception as e:
+        print(f"Error in seasonal decomposition: {e}")
+        return None
+
 # 9. 메인 로직
 def main():
     # 설정
@@ -593,9 +706,9 @@ def main():
     seq_length = 60
     
     # 학습 및 예측 기간 설정 (일 단위)
-    train_days = 120  # 학습 기간 (최소 seq_length의 2배 이상)
-    pred_days = 21    # 예측 기간 (약 1개월)
-    step_days = 21    # 워크포워드 이동 간격
+    train_days = 300  # 학습 기간 (최소 seq_length의 2배 이상)
+    pred_days = 30    # 예측 기간 (약 1개월)
+    step_days = 30    # 워크포워드 이동 간격
     
     # 그래프 저장 설정
     save_graphs = False
@@ -622,6 +735,10 @@ def main():
     
     # 추가 특성: 고가-저가 비율
     data['HL_Ratio'] = (data['High'] - data['Low']) / data['Close'] * 100
+    
+    # 계절성 분석 및 특성 추가
+    seasonality_analysis = analyze_seasonality(data, column='Close', plot=True, save_path=save_path)
+    data = add_seasonality_features(data)
     
     # 결측치 제거
     data.dropna(inplace=True)
