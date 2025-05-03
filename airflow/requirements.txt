@@ -7,7 +7,7 @@ confluent-kafka
 asgiref
 requests
 pendulum
-yfinance
+yfinance==0.2.54
 scikit-learn
 matplotlib
 tensorflow

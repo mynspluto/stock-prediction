@@ -22,6 +22,35 @@ from airflow.operators.python import PythonOperator
 # 시스템에 설치된 폰트 설정
 plt.rc('font', family='NanumGothic')
 
+feature_sets = {
+    "기본 특성": ['Close', 'Open', 'High', 'Low', 'Volume'],
+    "기본 특성 + 기술 특성": [
+        'Close', 'Open', 'High', 'Low', 'Volume',
+        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    ],
+    "기본 특성(1차 차분)": [
+        'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff'
+    ],
+    "기본 특성(2차 차분)": [
+        'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2'
+    ],
+    "기본 특성(변화율)": [
+        'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change'
+    ],
+    "기본 특성(1차 차분) + 기술 특성": [
+        'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff',
+        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    ],
+    "기본 특성(2차 차분) + 기술 특성": [
+        'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2',
+        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    ],
+    "기본 특성(변화율) + 기술 특성": [
+        'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change',
+        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    ]
+}
+
 # 데이터 가져오기 함수
 def fetch_stock_data(ticker, start=None, end=None, **kwargs):
     """
@@ -296,27 +325,10 @@ def train_and_evaluate_model(ticker, **kwargs):
     
     print("Training and evaluating model...")
     
-    # 특성 집합 정의 - 원본 코드와 동일하게
-    feature_sets = {
-        "기본 특성만": ['Close', 'Open', 'High', 'Low', 'Volume'],
-        "기술적 특성만": [
-            'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ],
-        "기술적2 특성만": [
-            'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ],
-        "변화 특성만": [
-            'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ]
-    }
-    
     # 원본 코드와 동일하게 설정
     target_col = 'Close'
-    seq_length = 120  # 원본 코드와 동일하게 120으로 설정
-    epochs = 10       # 원본 코드와 동일하게 10으로 설정
+    seq_length = 120
+    epochs = 20
     results = {}
     
     # 각 특성 조합 평가
@@ -457,23 +469,6 @@ def visualize_predictions(ticker, **kwargs):
     data = pd.read_csv(processed_file, index_col=0, parse_dates=True)
     
     print(f"Visualizing predictions with best feature set: '{best_feature_set}'")
-    
-    # 특성 집합 정의
-    feature_sets = {
-        "기본 특성만": ['Close', 'Open', 'High', 'Low', 'Volume'],
-        "기술적 특성만": [
-            'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ],
-        "기술적2 특성만": [
-            'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ],
-        "변화 특성만": [
-            'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change',
-            'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-        ]
-    }
     
     # 선택된 특성 집합 가져오기
     valid_features = [f for f in feature_sets[best_feature_set] if f in data.columns]
@@ -625,4 +620,5 @@ with DAG(
     )
     
     # 태스크 간 의존성 설정
-    fetch_data_task >> add_indicators_task >> visualize_data_task >> train_model_task >> visualize_predictions_task
+    fetch_data_task >> add_indicators_task >> visualize_data_task >> train_model_task
+    # >> visualize_predictions_task
