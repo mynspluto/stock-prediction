@@ -183,7 +183,6 @@ def plotChart(data, columns=['Close', 'SMA_20', 'SMA_60'], title=None, save_path
         # else:
         #     plt.show()
 
-# 3. 데이터 저장 및 로드 함수
 def saveData(data, filename):
     """
     전처리된 데이터를 파일로 저장합니다.
@@ -192,10 +191,16 @@ def saveData(data, filename):
     data (pd.DataFrame): 저장할 데이터
     filename (str): 파일 이름 (확장자 제외)
     """
+    # 데이터 디렉토리 생성
     if not os.path.exists('data'):
         os.makedirs('data')
     
-    data.to_csv(f'data/{filename}.csv')
+    # 멀티 인덱스가 있는지 확인하고 리셋
+    if isinstance(data.index, pd.MultiIndex) or data.index.name == 'Ticker':
+        data = data.reset_index()
+    
+    # 날짜 인덱스가 있는 데이터프레임 저장
+    data.to_csv(f'data/{filename}.csv', index=True)
     print(f"데이터 저장 완료: data/{filename}.csv")
 
 def loadData(filename):
@@ -208,8 +213,23 @@ def loadData(filename):
     Returns:
     pd.DataFrame: 로드된 데이터
     """
-    data = pd.read_csv(f'data/{filename}.csv', index_col=0, parse_dates=True)
-    print(f"데이터 로드 완료: data/{filename}.csv")
+    # 파일 존재 여부 확인
+    file_path = f'data/{filename}.csv'
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"파일을 찾을 수 없습니다: {file_path}")
+    
+    # 데이터프레임 로드
+    data = pd.read_csv(file_path)
+    
+    # 'Date' 열이 있으면 이를 인덱스로 설정
+    if 'Date' in data.columns:
+        data['Date'] = pd.to_datetime(data['Date'])
+        data = data.set_index('Date')
+    
+    print(f"데이터 로드 완료: {file_path}")
+    print(f"데이터 형태: {data.shape}")
+    print(f"인덱스 타입: {data.index.dtype}")
+    
     return data
 
 # 4. 다변량 시퀀스 생성 함수
@@ -486,10 +506,41 @@ def main():
     target_col = 'Close'
     seq_length = 120
     
-    # 학습 및 예측 기간 설정 (일 단위)
-    train_days = 300  # 학습 기간 (최소 seq_length의 2배 이상)
-    pred_days = 60    # 예측 기간 (약 1개월)
-    step_days = 60    # 워크포워드 이동 간격
+    # 파일 이름 설정
+    data_filename = f"{ticker}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
+    
+    # 1. 데이터 가져오기
+    rawData = fetchData(ticker, start_date, end_date)
+    rawData.columns = rawData.columns.get_level_values(0)
+    print('데이터 가져오기 완료:\n', rawData.head())
+    
+    # 2. 지표 추가
+    print("\n기술적 지표 추가 중...")
+    processedData = rawData.copy()
+    processedData = addSMA(processedData)
+    processedData = addMACD(processedData)
+    processedData = addRSI(processedData)
+    processedData = addDiff(processedData)
+    processedData = addDiff2(processedData)
+    processedData = addChange(processedData)
+    processedData['HL_Ratio'] = (processedData['High'] - processedData['Low']) / processedData['Close'] * 100
+    
+    # 결측치 제거
+    processedData.dropna(inplace=True)
+    
+    print("기술적 지표 추가 완료!")
+    
+    # 3. 전처리된 데이터 저장
+    saveData(processedData, data_filename)
+    
+    # 저장된 데이터 로드
+    print(f"\n저장된 데이터 파일 '{data_filename}' 로드 중...")
+    loadedData = loadData(data_filename)
+    print("저장된 데이터 파일 로드 완료!")
+    
+    # 데이터 확인
+    print('\n데이터 특성 확인:')
+    print(loadedData[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'RSI', 'Close_Diff', 'Close_Diff2', 'Close_Change']].tail())
     
     # 그래프 저장 설정
     save_graphs = True
@@ -499,32 +550,28 @@ def main():
     else:
         save_path = None
     
-    # 1. 데이터 가져오기
-    data = fetchData(ticker, start_date, end_date)
-    print('데이터 가져오기 완료:\n', data.head())
+    # 4. 데이터 시각화
+    print("\n데이터 시각화 중...")
+    plotChart(loadedData, ['Close', 'SMA_20', 'SMA_60'], f'{ticker} 주가 및 이동평균', f'{save_path}/price_and_sma') 
+    plotChart(loadedData, ['MACD', 'Signal'], f'{ticker} MACD 지표', f'{save_path}/macd', show_macd=True)
+    plotChart(loadedData, ['RSI'], f'{ticker} RSI 지표', f'{save_path}/rsi')
+    plotChart(loadedData, ['Close_Diff', 'Close_Diff2'], f'{ticker} 가격 차분', f'{save_path}/price_diff')
+    plotChart(loadedData, ['Close_Change'], f'{ticker} 가격 변화율(%)', f'{save_path}/price_change')
+    print("데이터 시각화 완료!")
     
-    # 2. 지표 추가
-    data = addSMA(data)
-    data = addMACD(data)
-    data = addRSI(data)
-    data = addDiff(data)
-    data = addDiff2(data)
-    data = addChange(data)
-    data['HL_Ratio'] = (data['High'] - data['Low']) / data['Close'] * 100
-    
-    print('\n특성 추가 완료:')
-    print(data[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'RSI', 'Close_Diff', 'Close_Diff2', 'Close_Change']].tail())
-    
-    # 결측치 제거
-    data.dropna(inplace=True)
-    
-    # 3. 데이터 시각화
-    plotChart(data, ['Close', 'SMA_20', 'SMA_60', 'RSI', 'MACD'], f'{ticker} Stock Price', f'{save_path}/sma') 
-    plotChart(data, ['Close_Diff', 'Close_Diff2', 'Close_Change'], f'{ticker} Stock diff', f'{save_path}/diff') 
-        
-    # 4. 특성 평가 수행
+    # 5. 특성 평가 수행
     print("\n다양한 특성 조합에 대한 평가를 시작합니다...")
-    feature_evaluation = evaluate_feature_sets(data, target_col=target_col, seq_length=seq_length, epochs=5)
+    feature_evaluation = evaluate_feature_sets(loadedData, target_col=target_col, seq_length=seq_length, epochs=5)
+    print("특성 평가 완료!")
+    
+    # 6. 평가 결과 요약
+    print("\n=== 최종 특성 조합별 성능 요약 ===")
+    for name, mape in sorted(feature_evaluation.items(), key=lambda x: x[1]):
+        print(f"{name}: MAPE {mape:.2f}%")
+    
+    # 최고 성능 특성 조합 선택
+    best_feature_set = min(feature_evaluation.items(), key=lambda x: x[1])[0]
+    print(f"\n최고 성능 특성 조합: {best_feature_set}")
     
 if __name__ == "__main__":
     main()
