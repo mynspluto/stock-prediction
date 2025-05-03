@@ -7,6 +7,7 @@ export AIRFLOW_HOME=~/airflow
 
 python3 -m venv airflow_env
 source airflow_env/bin/activate
+pip install -r requirements.txt
 
 pip install apache-airflow
 pip install 'apache-airflow[postgres,celery]'

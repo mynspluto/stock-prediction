@@ -542,6 +542,7 @@ def main():
     print('\n데이터 특성 확인:')
     print(loadedData[['Close', 'SMA_5', 'SMA_20', 'SMA_60', 'MACD', 'RSI', 'Close_Diff', 'Close_Diff2', 'Close_Change']].tail())
     
+    loadedData.to_csv(f'data/loaded.csv', index=True)
     # 그래프 저장 설정
     save_graphs = True
     if save_graphs:
@@ -581,3 +582,9 @@ if __name__ == "__main__":
 # .\venv\Scripts\Activate.ps1
 # pip install -r requirements.txt
 # python test2.py
+
+# cd ml
+# python3 -m venv venv
+# source .venv/bin/activate
+# pip install -r requirements.txt
+# python3 test2.py

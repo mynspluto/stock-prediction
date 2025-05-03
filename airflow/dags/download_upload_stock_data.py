@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-# 환경 설정000
+# 환경 설정
 ENVIRONMENT = os.getenv('AIRFLOW_ENV', 'local')  # 기본값은 local
 
 # 환경별 설정
@@ -45,6 +45,8 @@ def fetch_stock_data(stock_data_path, tickers):
         # 가장 최근 데이터 날짜 확인
         ticker_directory = f"{stock_data_path}/{ticker}"
         last_date = get_last_date(ticker_directory)
+        
+        
         
         # yfinance에서 데이터 가져오기
         stock = yf.Ticker(ticker)

@@ -1,2 +1,4 @@
 airflow_env/
 data/
+results/
+*.png
