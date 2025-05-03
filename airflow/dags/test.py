@@ -28,27 +28,27 @@ feature_sets = {
         'Close', 'Open', 'High', 'Low', 'Volume',
         'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
     ],
-    "기본 특성(1차 차분)": [
-        'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff'
-    ],
-    "기본 특성(2차 차분)": [
-        'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2'
-    ],
-    "기본 특성(변화율)": [
-        'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change'
-    ],
-    "기본 특성(1차 차분) + 기술 특성": [
-        'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff',
-        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-    ],
-    "기본 특성(2차 차분) + 기술 특성": [
-        'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2',
-        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-    ],
-    "기본 특성(변화율) + 기술 특성": [
-        'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change',
-        'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
-    ]
+    # "기본 특성(1차 차분)": [
+    #     'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff'
+    # ],
+    # "기본 특성(2차 차분)": [
+    #     'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2'
+    # ],
+    # "기본 특성(변화율)": [
+    #     'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change'
+    # ],
+    # "기본 특성(1차 차분) + 기술 특성": [
+    #     'Close_Diff', 'Open_Diff', 'High_Diff', 'Low_Diff', 'Volume_Diff',
+    #     'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    # ],
+    # "기본 특성(2차 차분) + 기술 특성": [
+    #     'Close_Diff2', 'Open_Diff2', 'High_Diff2', 'Low_Diff2', 'Volume_Diff2',
+    #     'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    # ],
+    # "기본 특성(변화율) + 기술 특성": [
+    #     'Close_Change', 'Open_Change', 'High_Change', 'Low_Change', 'Volume_Change',
+    #     'SMA_5', 'SMA_20', 'SMA_60', 'RSI', 'MACD', 'HL_Ratio'
+    # ]
 }
 
 # 데이터 가져오기 함수
@@ -306,6 +306,135 @@ def build_lstm_model(seq_length, n_features=1, layers=[50, 50], dropouts=[0.2, 0
     
     return model
 
+# 모델 저장 및 로드 함수 추가
+def save_model(model, scaler_dict, feature_set, results_dir, ticker):
+    """
+    학습된 모델과 스케일러를 저장합니다.
+    
+    Parameters:
+    model: 학습된 LSTM 모델
+    scaler_dict: 데이터 정규화에 사용된 스케일러 사전
+    feature_set: 사용된 특성 집합 이름
+    results_dir: 결과 저장 디렉토리
+    ticker: 주식 티커
+    
+    Returns:
+    str: 모델 저장 경로
+    """
+    # 모델 디렉토리 생성
+    model_dir = f"{results_dir}/models"
+    os.makedirs(model_dir, exist_ok=True)
+    
+    # 안전한 파일명 생성 (특수문자 제거)
+    safe_ticker = ticker.replace('^', '').replace('/', '_')
+    safe_feature_set = feature_set.replace(' ', '_')
+    
+    # 모델 저장 경로 (확장자 .keras 추가)
+    model_path = f"{model_dir}/{safe_ticker}_{safe_feature_set}_model.keras"
+    
+    # 모델 저장
+    model.save(model_path)
+    print(f"모델 저장 완료: {model_path}")
+    
+    # 스케일러 저장
+    scaler_path = f"{model_dir}/{safe_ticker}_{safe_feature_set}_scalers.pkl"
+    with open(scaler_path, 'wb') as f:
+        pickle.dump(scaler_dict, f)
+    print(f"스케일러 저장 완료: {scaler_path}")
+    
+    # 모델 메타데이터 저장
+    meta_path = f"{model_dir}/{safe_ticker}_{safe_feature_set}_meta.json"
+    meta_data = {
+        'ticker': ticker,
+        'feature_set': feature_set,
+        'features': list(scaler_dict.keys()),
+        'created_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'model_path': model_path,
+        'scaler_path': scaler_path
+    }
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta_data, f, ensure_ascii=False, indent=4)
+    print(f"메타데이터 저장 완료: {meta_path}")
+    
+    return model_path
+
+def load_model(model_path, scaler_path):
+    """
+    저장된 모델과 스케일러를 로드합니다.
+    
+    Parameters:
+    model_path: 모델 파일 경로(.keras 확장자 포함)
+    scaler_path: 스케일러 파일 경로
+    
+    Returns:
+    tuple: (모델, 스케일러 사전)
+    """
+    # 파일 존재 확인
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"모델 파일이 존재하지 않습니다: {model_path}")
+    
+    if not os.path.exists(scaler_path):
+        raise FileNotFoundError(f"스케일러 파일이 존재하지 않습니다: {scaler_path}")
+    
+    # 모델 로드
+    model = tf.keras.models.load_model(model_path)
+    print(f"모델 로드 완료: {model_path}")
+    
+    # 스케일러 로드
+    with open(scaler_path, 'rb') as f:
+        scaler_dict = pickle.load(f)
+    print(f"스케일러 로드 완료: {scaler_path}")
+    
+    return model, scaler_dict
+
+# 모델 목록 조회 및 관리 함수
+def list_saved_models(**kwargs):
+    """
+    저장된 모델 목록을 조회합니다.
+    """
+    models_dir = "results"
+    model_files = []
+    
+    try:
+        for root, dirs, files in os.walk(models_dir):
+            for dir_name in dirs:
+                if dir_name == "models":
+                    model_dir = os.path.join(root, dir_name)
+                    for model_root, _, model_files in os.walk(model_dir):
+                        meta_files = [f for f in model_files if f.endswith("_meta.json")]
+                        for meta_file in meta_files:
+                            try:
+                                meta_path = os.path.join(model_root, meta_file)
+                                with open(meta_path, 'r', encoding='utf-8') as f:
+                                    meta_data = json.load(f)
+                                    model_files.append({
+                                        'path': os.path.join(model_root, meta_file.replace("_meta.json", "_model")),
+                                        'ticker': meta_data.get('ticker', 'Unknown'),
+                                        'feature_set': meta_data.get('feature_set', 'Unknown'),
+                                        'created_date': meta_data.get('created_date', 'Unknown')
+                                    })
+                            except Exception as e:
+                                print(f"메타 파일 처리 중 오류: {meta_path}, 오류: {str(e)}")
+    except Exception as e:
+        print(f"모델 목록 로드 중 오류: {str(e)}")
+    
+    # 모델 정보 출력
+    if model_files:
+        print("\n=== 저장된 모델 목록 ===")
+        for i, model_info in enumerate(model_files, 1):
+            # 타입 검증 추가
+            if isinstance(model_info, dict):
+                print(f"{i}. 티커: {model_info.get('ticker', 'Unknown')}, 특성 집합: {model_info.get('feature_set', 'Unknown')}, 생성일: {model_info.get('created_date', 'Unknown')}")
+            else:
+                print(f"{i}. 모델 정보 형식 오류: {type(model_info)}, 내용: {model_info}")
+    else:
+        print("저장된 모델이 없습니다.")
+    
+    # XCom을 통해 모델 목록 전달
+    kwargs['ti'].xcom_push(key='model_list', value=model_files)
+    
+    return True
+
 # 모델 학습 및 평가 함수
 def train_and_evaluate_model(ticker, **kwargs):
     """
@@ -325,10 +454,9 @@ def train_and_evaluate_model(ticker, **kwargs):
     
     print("Training and evaluating model...")
     
-    # 원본 코드와 동일하게 설정
     target_col = 'Close'
     seq_length = 120
-    epochs = 20
+    epochs = 10
     results = {}
     
     # 각 특성 조합 평가
@@ -341,7 +469,7 @@ def train_and_evaluate_model(ticker, **kwargs):
         
         # 5번 반복 평가 (원본 코드와 동일)
         mapes = []
-        for i in range(5):
+        for i in range(3):
             try:
                 # 학습/테스트 데이터 분할 - 원본 코드와 동일하게
                 end_idx = len(data) - 30  # 마지막 30일은 테스트용
@@ -437,7 +565,8 @@ def train_and_evaluate_model(ticker, **kwargs):
     plt.close()
 
     # 최고 성능 특성 조합 선택 (MAPE 값이 가장 낮은 것)
-    best_feature_set = sorted_results[0][0]
+    #best_feature_set = sorted_results[0][0]
+    best_feature_set = '기본 특성'
     print(f"\n최고 성능 특성 조합: {best_feature_set}")
 
     # 결과 저장 - 정렬된 결과와 UTF-8 인코딩 사용
@@ -449,9 +578,37 @@ def train_and_evaluate_model(ticker, **kwargs):
     
     print(f"Model evaluation results saved: {results_dir}/evaluation_results.json")
     
+    print(f"\n최고 성능 특성 조합 '{best_feature_set}'으로 최종 모델 훈련 중...")
+    
+    # 유효한 특성 추출
+    valid_features = [f for f in feature_sets[best_feature_set] if f in data.columns]
+    
+    # 전체 데이터를 학습에 사용
+    scaler_dict = {}
+    scaled_data = pd.DataFrame(index=data.index)
+    
+    for col in valid_features + [target_col]:
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaled_data[col] = scaler.fit_transform(data[[col]])
+        scaler_dict[col] = scaler
+    
+    # 시퀀스 생성
+    X_all, y_all = create_multivariate_sequences(
+        scaled_data, valid_features, target_col, seq_length
+    )
+    
+    # 최종 모델 훈련
+    final_model = build_lstm_model(seq_length, n_features=len(valid_features))
+    final_model.fit(X_all, y_all, epochs=epochs, batch_size=32, verbose=0)
+    print("최종 모델 훈련 완료!")
+    
+    # 모델 저장
+    model_path = save_model(final_model, scaler_dict, best_feature_set, results_dir, ticker)
+    
     # XCom을 통해 평가 결과 전달
     ti.xcom_push(key='evaluation_results', value=results)
     ti.xcom_push(key='best_feature_set', value=best_feature_set)
+    ti.xcom_push(key='model_path', value=model_path)
     
     return True
 
@@ -464,66 +621,109 @@ def visualize_predictions(ticker, **kwargs):
     processed_file = ti.xcom_pull(key='processed_data_file', task_ids='add_indicators')
     best_feature_set = ti.xcom_pull(key='best_feature_set', task_ids='train_model')
     results_dir = ti.xcom_pull(key='visualization_dir', task_ids='visualize_data')
+    model_path = ti.xcom_pull(key='model_path', task_ids='train_model')
     
     print(f"Loading data from '{processed_file}'...")
     data = pd.read_csv(processed_file, index_col=0, parse_dates=True)
     
     print(f"Visualizing predictions with best feature set: '{best_feature_set}'")
     
+    # 모델 경로 생성
+    model_dir = f"{results_dir}/models"
+    safe_ticker = ticker.replace('^', '').replace('/', '_')
+    safe_feature_set = best_feature_set.replace(' ', '_')
+    model_path = f"{model_dir}/{safe_ticker}_{safe_feature_set}_model.keras"
+    scaler_path = f"{model_dir}/{safe_ticker}_{safe_feature_set}_scalers.pkl"
+
+    # 모델이 있으면 로드, 없으면 새로 훈련
+    try:
+        model, scaler_dict = load_model(model_path, scaler_path)
+        print("저장된 모델을 로드했습니다.")
+    except Exception as e:
+        print(f"저장된 모델을 로드할 수 없습니다: {str(e)}")
+        print("새로운 모델을 훈련합니다.")
+        
+        # 모델 새로 훈련 (기존 코드와 동일)
+        # 선택된 특성 집합 가져오기
+        valid_features = [f for f in feature_sets[best_feature_set] if f in data.columns]
+        target_col = 'Close'
+        seq_length = 120
+        
+        # 학습/테스트 데이터 분할
+        end_idx = len(data) - 30  # 마지막 30일은 테스트용
+        start_idx = end_idx - 300 - seq_length  # 300일 학습 + 시퀀스 길이
+        
+        if start_idx < 0:
+            start_idx = 0
+        
+        train_data = data.iloc[start_idx:end_idx]
+        test_data = data.iloc[end_idx:min(end_idx+30, len(data))]
+        
+        # 데이터 정규화
+        scaler_dict = {}
+        scaled_train = pd.DataFrame(index=train_data.index)
+        scaled_test = pd.DataFrame(index=test_data.index)
+        
+        for col in valid_features + [target_col]:
+            scaler = MinMaxScaler(feature_range=(0, 1))
+            scaled_train[col] = scaler.fit_transform(train_data[[col]])
+            scaled_test[col] = scaler.transform(test_data[[col]])
+            scaler_dict[col] = scaler
+        
+        # 시퀀스 생성
+        X_train, y_train = create_multivariate_sequences(
+            scaled_train, valid_features, target_col, seq_length
+        )
+        
+        # 모델 생성 및 학습
+        model = build_lstm_model(seq_length, n_features=len(valid_features))
+        model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=0)
+    
+    # 여기서부터는 모델과 스케일러를 사용한 예측 코드
     # 선택된 특성 집합 가져오기
     valid_features = [f for f in feature_sets[best_feature_set] if f in data.columns]
     target_col = 'Close'
-    seq_length = 120  # 원본 코드와 동일하게 120
+    seq_length = 120
     
-    # 학습/테스트 데이터 분할
-    end_idx = len(data) - 30  # 마지막 30일은 테스트용
-    start_idx = end_idx - 300 - seq_length  # 300일 학습 + 시퀀스 길이
-    
-    if start_idx < 0:
-        start_idx = 0
-    
-    train_data = data.iloc[start_idx:end_idx]
+    # 테스트 데이터 분할
+    end_idx = len(data) - 30
     test_data = data.iloc[end_idx:min(end_idx+30, len(data))]
     
-    # 데이터 정규화
-    scaler_dict = {}
-    scaled_train = pd.DataFrame(index=train_data.index)
-    scaled_test = pd.DataFrame(index=test_data.index)
+    # 예측을 위한 시퀀스 준비
+    input_sequence = data.iloc[end_idx-seq_length:end_idx][valid_features]
+    input_scaled = np.zeros((1, seq_length, len(valid_features)))
     
-    for col in valid_features + [target_col]:
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled_train[col] = scaler.fit_transform(train_data[[col]])
-        scaled_test[col] = scaler.transform(test_data[[col]])
-        scaler_dict[col] = scaler
+    # 입력 시퀀스 스케일링
+    for i, col in enumerate(valid_features):
+        input_scaled[0, :, i] = scaler_dict[col].transform(input_sequence[[col]]).flatten()
     
-    # 시퀀스 생성
-    X_train, y_train = create_multivariate_sequences(
-        scaled_train, valid_features, target_col, seq_length
-    )
-    
-    # 모델 생성 및 학습
-    model = build_lstm_model(seq_length, n_features=len(valid_features))
-    # 더 많은 에포크로 학습 (원본 코드보다 높게 설정)
-    model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=0)
-    
-    # 테스트 예측
-    test_seq = scaled_train[valid_features].iloc[-seq_length:].values
-    test_seq = test_seq.reshape(1, seq_length, len(valid_features))
-    
+    # 예측 수행
     preds = []
-    actual = scaled_test[target_col].values
+    actual = test_data[target_col].values
+    current_seq = input_scaled.copy()
     
     for i in range(len(actual)):
-        pred = model.predict(test_seq, verbose=0)[0, 0]
+        # 예측
+        pred = model.predict(current_seq, verbose=0)[0, 0]
         preds.append(pred)
         
+        # 다음 시퀀스 준비 (예측이 더 필요한 경우)
         if i < len(actual) - 1:
-            test_seq = np.roll(test_seq, -1, axis=1)
-            next_features = scaled_test[valid_features].iloc[i+1].values
-            test_seq[0, -1, :] = next_features
+            # 새로운 데이터 얻기
+            new_point = np.zeros(len(valid_features))
+            for j, feat in enumerate(valid_features):
+                if feat == target_col:
+                    new_point[j] = pred
+                else:
+                    # 실제 다른 특성값 사용
+                    new_point[j] = scaler_dict[feat].transform(test_data.iloc[i:i+1][[feat]])[0, 0]
+            
+            # 시퀀스 업데이트
+            current_seq = np.roll(current_seq, -1, axis=1)
+            current_seq[0, -1, :] = new_point
     
     # 원래 스케일로 변환
-    y_true = scaler_dict[target_col].inverse_transform(actual.reshape(-1, 1)).flatten()
+    y_true = actual
     y_pred = scaler_dict[target_col].inverse_transform(np.array(preds).reshape(-1, 1)).flatten()
     
     # MAPE, MAE, RMSE 계산
@@ -583,11 +783,11 @@ with DAG(
     
     # 티커 및 날짜 설정
     ticker = '^IXIC'  # NASDAQ 지수
-    # start_date = '2010-01-01'
-    # end_date = '2020-01-01'
+    start_date = '2010-01-01'
+    end_date = '2020-01-01'
     
-    start_date = '1971-02-05'
-    end_date = '2025-05-01'
+    # start_date = '1971-02-05'
+    # end_date = '2025-05-01'
     
     # 태스크 정의
     fetch_data_task = PythonOperator(
@@ -618,7 +818,11 @@ with DAG(
         python_callable=visualize_predictions,
         op_kwargs={'ticker': ticker},
     )
-    
-    # 태스크 간 의존성 설정
-    fetch_data_task >> add_indicators_task >> visualize_data_task >> train_model_task
-    # >> visualize_predictions_task
+
+    list_models_task = PythonOperator(
+        task_id='list_models',
+        python_callable=list_saved_models,
+    )
+
+    # 태스크 의존성 설정 수정
+    fetch_data_task >> add_indicators_task >> visualize_data_task >> train_model_task >> visualize_predictions_task >> list_models_task

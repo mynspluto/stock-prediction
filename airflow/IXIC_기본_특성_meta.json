@@ -1,0 +1,14 @@
+{
+    "ticker": "^IXIC",
+    "feature_set": "기본 특성",
+    "features": [
+        "Close",
+        "Open",
+        "High",
+        "Low",
+        "Volume"
+    ],
+    "created_date": "2025-05-03 22:57:27",
+    "model_path": "results/^IXIC_20250503_225632/models/IXIC_기본_특성_model.keras",
+    "scaler_path": "results/^IXIC_20250503_225632/models/IXIC_기본_특성_scalers.pkl"
+}
