@@ -763,9 +763,8 @@ def visualize_predictions(ticker, **kwargs):
     
     return True
 
-# DAG 정의
 with DAG(
-    'test',
+    'stock_price_data_etl_ml',
     default_args={
         'owner': 'airflow',
         'depends_on_past': False,
@@ -774,9 +773,9 @@ with DAG(
         'retries': 1,
         'retry_delay': timedelta(minutes=5),
     },
-    description='Stock data collection, technical indicator addition, and LSTM prediction',
-    schedule_interval='@daily',  # 매일 실행
-    start_date=datetime(2021, 1, 1),
+    description='주식 데이터를 야후 파이낸스에서 수집후 기술적 지표 추가, LSTM 모델링',
+    #schedule_interval='@daily',  # 매일 실행
+    #start_date=datetime(2021, 1, 1),
     catchup=False,
     tags=['stock', 'prediction', 'lstm'],
 ) as dag:

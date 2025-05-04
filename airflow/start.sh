@@ -1,2 +1,3 @@
+#!zsh
 source airflow_env/bin/activate
 airflow standalone
