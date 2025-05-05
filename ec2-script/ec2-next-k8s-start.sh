@@ -8,10 +8,10 @@ kubectl config set-context --current --namespace=web
 eval $(minikube -p minikube docker-env) # unset DOCKER_HOST
 
 # Docker 이미지 빌드
-docker build -t nextjs:latest -f ./web/ec2-Dockerfile ./web
+docker build -t nextjs:latest -f ../web/ec2-Dockerfile ../web
 
 # 배포 적용
-kubectl apply -f ./web/dep.yml -n web
+kubectl apply -f ../web/dep.yml -n web
 
 kubectl rollout restart deployment nextjs -n web
 kubectl rollout status deployment/nextjs -n web --timeout=300s
@@ -20,9 +20,9 @@ kubectl rollout status deployment/nextjs -n web --timeout=300s
 echo "Waiting for nextjs pod to be ready..."
 kubectl wait --for=condition=Ready pod -l app=nextjs -n web --timeout=300s
 
-kubectl apply -f ./web/svc.yml
+kubectl apply -f ../web/svc.yml
 
 minikube addons enable ingress
 minikube addons enable ingress-dns
 
-kubectl apply -f ./web/ec2-ingress.yml
+kubectl apply -f ../web/ec2-ingress.yml

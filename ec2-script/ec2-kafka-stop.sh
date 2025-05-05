@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-kubectl delete -f ./kafka/svc.yml
-kubectl delete -f ./kafka/dep.yml
+kubectl delete -f ../kafka/svc.yml
+kubectl delete -f ../kafka/dep.yml
 
 # 모든 port-forward 프로세스 찾아서 종료
 echo "Killing all kubectl port-forward processes..."
