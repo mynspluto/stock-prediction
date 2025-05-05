@@ -16,6 +16,7 @@ Airflow, Hadoop, Kafka, Kubernetes(Minikube), Docker, Next, FastAPI
   - 저장된 모델로 다음 영업일의 주가 예측
   - 현재 장이 시작된 경우 예측했던 주가와 오차가 크면 메시지 전송하여 로그 생성
 - 자동 배포
+  - 현재는 배포 중단된 상태입니다
   - Github Action을 사용하여 자동 배포를 구성하였습니다
   - Kubernetes Rolling을 통해 무중단으로 운영 중입니다
 
