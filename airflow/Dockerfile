@@ -52,6 +52,7 @@ USER root
 
 COPY ./dags/download_upload_stock_data.py /opt/airflow/dags/download_upload_stock_data.py
 COPY ./dags/update_stock_prediction_model.py /opt/airflow/dags/update_stock_prediction_model.py
+COPY ./dags/lstm_version.py /opt/airflow/dags/lstm_version.py
 COPY ./dags/mapreduce/stock_mapper.py /opt/airflow/dags/mapreduce/stock_mapper.py
 COPY ./dags/mapreduce/stock_reducer.py /opt/airflow/dags/mapreduce/stock_reducer.py
 RUN ls -l /opt/airflow/dags

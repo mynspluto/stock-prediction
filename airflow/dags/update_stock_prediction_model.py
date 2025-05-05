@@ -391,7 +391,7 @@ def save_model_results_to_hdfs(ticker, results):
         "retries": 1,
         "retry_delay": timedelta(minutes=5),
     },
-    description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 모델 저장",
+    description="월 별(YYYY-MM)로 저장된 주가 데이터를 합친후 주가 예측 랜덤 포레스트 모델 학습, 저장",
     schedule_interval="0 4 * * *",
     start_date=datetime(2021, 1, 1),
     catchup=False,
